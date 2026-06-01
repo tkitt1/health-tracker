@@ -805,7 +805,8 @@
     }
     .auth-input:focus { border-color: var(--accent); }
     .auth-msg { font-size: 0.8rem; color: var(--orange); margin-bottom: 12px; min-height: 16px; }
-    .auth-actions { display: flex; gap: 8px; }
+    .auth-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .exp-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
 
     /* History */
     .history-toggle {
@@ -967,7 +968,7 @@
     <!-- History -->
     <div class="section">
       <div class="history-actions">
-        <button class="history-toggle" onclick="toggleHistory()">View History</button>
+        <button class="history-toggle" id="historyBtn" onclick="toggleHistory()">View History</button>
         <button class="history-toggle" onclick="exportCSV()">⬇ Export CSV</button>
       </div>
       <div id="historyContainer" style="display:none"></div>
@@ -998,6 +999,27 @@
         <div class="auth-msg" id="authMsg"></div>
         <div class="auth-actions">
           <button class="if-btn if-start-btn" onclick="sendMagicLink()">Send Magic Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export CSV modal -->
+  <div class="modal-overlay" id="exportOverlay" style="display:none" onclick="if(event.target===this)closeExport()">
+    <div class="modal">
+      <div class="modal-header">
+        <span>⬇ Export CSV</span>
+        <button class="modal-close" onclick="closeExport()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="auth-help">Choose a date range, or export your entire history. One row per day.</p>
+        <label class="exp-label">From</label>
+        <input type="date" id="expFrom" class="auth-input">
+        <label class="exp-label">To</label>
+        <input type="date" id="expTo" class="auth-input">
+        <div class="auth-actions">
+          <button class="if-btn if-start-btn" onclick="runExport('range')">Export range</button>
+          <button class="if-btn if-reset-btn" onclick="runExport('all')">Export all</button>
         </div>
       </div>
     </div>
@@ -1857,19 +1879,53 @@
       return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
     }
 
+    function allDayKeys() {
+      return Object.keys(localStorage)
+        .filter(k => /^ht_\d{4}-\d{2}-\d{2}$/.test(k))
+        .map(k => k.slice(3)).sort();
+    }
+
+    // Open the export options dialog (date range / all)
     function exportCSV() {
+      const days = allDayKeys();
+      const today = dateKey(new Date());
+      document.getElementById('expFrom').value = days[0] || today;
+      document.getElementById('expTo').value = days[days.length - 1] || today;
+      document.getElementById('exportOverlay').style.display = 'flex';
+    }
+    function closeExport() { document.getElementById('exportOverlay').style.display = 'none'; }
+
+    function runExport(scope) {
+      let from, to, suffix;
+      if (scope === 'all') {
+        from = '0000-01-01'; to = '9999-12-31'; suffix = 'all';
+      } else {
+        from = document.getElementById('expFrom').value;
+        to = document.getElementById('expTo').value;
+        if (!from || !to) { alert('Pick both a From and To date.'); return; }
+        if (from > to) { const t = from; from = to; to = t; }
+        suffix = from + '_to_' + to;
+      }
+
       const rows = Object.keys(localStorage)
         .filter(k => /^ht_\d{4}-\d{2}-\d{2}$/.test(k))
         .map(k => ({ date: k.slice(3), data: JSON.parse(localStorage.getItem(k) || '{}') }))
+        .filter(r => r.date >= from && r.date <= to)
         .sort((a, b) => a.date < b.date ? -1 : 1);
 
+      if (rows.length === 0) { alert('No data in that range.'); return; }
+
+      downloadCSV('health-tracker-' + suffix + '.csv', buildCSV(rows));
+      closeExport();
+    }
+
+    function buildCSV(rows) {
       const cols = [
-        'date', 'pushups', 'pullups', 'dips', 'squats',
+        'date', 'pushups', 'squats', 'pullups', 'dips',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
         'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'workout_notes'
       ];
-
       const lines = [cols.join(',')];
       rows.forEach(r => {
         const d = r.data;
@@ -1881,7 +1937,7 @@
           ? protein.filter(x => x.item).map(x => `${x.v}g ${x.item}`).join('; ') : '';
         const vals = [
           r.date,
-          sumVal(d.pushups), sumVal(d.pullups), sumVal(d.dips), sumVal(d.squats),
+          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips),
           sumVal(d.bike, 'time'), sumVal(d.bike, 'dist'),
           sumVal(d.run, 'time'), sumVal(d.run, 'dist'),
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
@@ -1892,28 +1948,41 @@
         ];
         lines.push(vals.map(csvEscape).join(','));
       });
+      return '﻿' + lines.join('\r\n');
+    }
 
-      if (rows.length === 0) { alert('No data to export yet.'); return; }
-
-      const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    // iOS-friendly: use the Share sheet when available, else a normal download.
+    function downloadCSV(filename, csv) {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      try {
+        const file = new File([blob], filename, { type: 'text/csv' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: filename }).catch(() => {});
+          return;
+        }
+      } catch (e) { /* fall through to download */ }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'health-tracker-' + dateKey(new Date()) + '.csv';
+      a.download = filename;
+      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
 
     // History
     function toggleHistory() {
       const container = document.getElementById('historyContainer');
+      const btn = document.getElementById('historyBtn');
       if (container.style.display === 'none') {
         container.style.display = 'block';
         renderHistory();
+        if (btn) btn.textContent = 'Hide History';
       } else {
         container.style.display = 'none';
+        if (btn) btn.textContent = 'View History';
       }
     }
 
