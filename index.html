@@ -883,8 +883,22 @@
       color: var(--text-muted);
       margin: 18px 0 10px;
     }
-    .detail-group { margin-bottom: 14px; }
-    .detail-group-head { font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+    .detail-hint { font-size: 0.68rem; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-muted); }
+    .detail-group { margin-bottom: 6px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .detail-group-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 10px 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .detail-group-head:hover { background: var(--surface-hover); }
+    .detail-count { color: var(--text-muted); font-weight: 400; }
+    .detail-caret { color: var(--text-muted); font-size: 0.8rem; }
+    .detail-entries { padding: 0 12px 6px; }
     .detail-row {
       display: flex;
       justify-content: space-between;
@@ -2100,6 +2114,15 @@
       return new Date(dk + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
+    function toggleDetailGroup(key) {
+      const el = document.getElementById('detail_' + key);
+      const caret = document.getElementById('caret_' + key);
+      if (!el) return;
+      const open = el.style.display === 'none';
+      el.style.display = open ? 'block' : 'none';
+      if (caret) caret.innerHTML = open ? '&#9662;' : '&#9656;'; // ▾ / ▸
+    }
+
     // Flatten one metric's entries across the selected days, chronologically.
     function metricEntries(key, days, ds) {
       const out = [];
@@ -2164,20 +2187,26 @@
       });
       html += '</tbody></table>';
 
-      // ---- Detailed entry log (times, protein items, etc.) ----
-      html += '<div class="report-detail-title">Details</div>';
+      // ---- Detailed entry log (collapsible per metric) ----
+      html += '<div class="report-detail-title">Details <span class="detail-hint">tap to expand</span></div>';
       let anyDetail = false;
       reportDetailGroups().forEach(g => {
         const entries = metricEntries(g.key, days, ds);
         if (!entries.length) return;
         anyDetail = true;
-        html += `<div class="detail-group"><div class="detail-group-head">${g.icon} ${g.label}</div>`;
+        let rows = '';
         entries.forEach(e => {
           const time = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
           const when = (multi ? fmtDateShort(e._date) + ' ' : '') + time;
-          html += `<div class="detail-row"><span class="detail-when">${when}</span><span class="detail-val">${g.fmt(e)}</span></div>`;
+          rows += `<div class="detail-row"><span class="detail-when">${when}</span><span class="detail-val">${g.fmt(e)}</span></div>`;
         });
-        html += '</div>';
+        html += `<div class="detail-group">
+            <div class="detail-group-head" onclick="toggleDetailGroup('${g.key}')">
+              <span>${g.icon} ${g.label} <span class="detail-count">(${entries.length})</span></span>
+              <span class="detail-caret" id="caret_${g.key}">&#9656;</span>
+            </div>
+            <div class="detail-entries" id="detail_${g.key}" style="display:none">${rows}</div>
+          </div>`;
       });
       if (!anyDetail) html += '<p class="modal-empty">No timestamped entries in this period.</p>';
 
