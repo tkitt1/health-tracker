@@ -808,6 +808,26 @@
     .auth-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .exp-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
 
+    .report-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+    .rep-arrow {
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+    .report-period { font-weight: 600; font-size: 0.95rem; min-width: 150px; text-align: center; }
+    .report-jump { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+
     /* History */
     .history-toggle {
       background: var(--surface);
@@ -1938,50 +1958,94 @@
         .map(k => k.slice(3)).sort();
     }
 
-    // ---- Report: totals + daily averages over a period ----
+    // ---- Report: daily summary for a chosen Day / Week / Month / Year ----
+    let reportType = 'day';
+    let reportRef = null; // anchor Date
+
     function openReport() {
+      reportType = 'day';
+      reportRef = new Date();
       document.getElementById('reportOverlay').style.display = 'flex';
-      renderReport(7);
+      renderReport();
     }
     function closeReport() { document.getElementById('reportOverlay').style.display = 'none'; }
+    function setReportType(t) { reportType = t; renderReport(); }
+    function setReportDate(val) { if (val) { reportRef = new Date(val + 'T00:00:00'); renderReport(); } }
+    function shiftReport(dir) {
+      const d = new Date(reportRef);
+      if (reportType === 'day') d.setDate(d.getDate() + dir);
+      else if (reportType === 'week') d.setDate(d.getDate() + 7 * dir);
+      else if (reportType === 'month') d.setMonth(d.getMonth() + dir);
+      else d.setFullYear(d.getFullYear() + dir);
+      reportRef = d; renderReport();
+    }
 
-    function renderReport(days) {
-      const all = allDayKeys();
-      let keys = all, periodLabel = 'All time';
-      if (days > 0) {
-        const c = new Date(); c.setDate(c.getDate() - (days - 1));
-        const cutoff = dateKey(c);
-        keys = all.filter(d => d >= cutoff);
-        periodLabel = 'Last ' + days + ' days';
+    function reportRange() {
+      const r = new Date(reportRef);
+      let start, end;
+      if (reportType === 'day') { start = new Date(r); end = new Date(r); }
+      else if (reportType === 'week') {
+        const off = (r.getDay() + 6) % 7; // Monday-start week
+        start = new Date(r); start.setDate(r.getDate() - off);
+        end = new Date(start); end.setDate(start.getDate() + 6);
+      } else if (reportType === 'month') {
+        start = new Date(r.getFullYear(), r.getMonth(), 1);
+        end = new Date(r.getFullYear(), r.getMonth() + 1, 0);
+      } else {
+        start = new Date(r.getFullYear(), 0, 1);
+        end = new Date(r.getFullYear(), 11, 31);
       }
-      const ds = keys.map(d => JSON.parse(localStorage.getItem('ht_' + d) || '{}'));
+      return { from: dateKey(start), to: dateKey(end), start, end };
+    }
+
+    function reportLabel(start, end) {
+      if (reportType === 'day') return start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      if (reportType === 'week') return start.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' – ' + end.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+      if (reportType === 'month') return start.toLocaleDateString([], { month: 'long', year: 'numeric' });
+      return String(start.getFullYear());
+    }
+
+    function renderReport() {
+      const types = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']];
+      const { from, to, start, end } = reportRange();
+      const days = allDayKeys().filter(d => d >= from && d <= to);
+      const ds = days.map(d => JSON.parse(localStorage.getItem('ht_' + d) || '{}'));
       const n = ds.length;
       const body = document.getElementById('reportBody');
 
-      const periods = [{ d: 7, l: '7 days' }, { d: 30, l: '30 days' }, { d: 0, l: 'All' }];
-      let html = '<div class="goal-row">' + periods.map(p =>
-        `<button class="goal-btn${p.d === days ? ' active' : ''}" onclick="renderReport(${p.d})">${p.l}</button>`
+      let html = '<div class="goal-row">' + types.map(t =>
+        `<button class="goal-btn${reportType === t[0] ? ' active' : ''}" onclick="setReportType('${t[0]}')">${t[1]}</button>`
       ).join('') + '</div>';
+      html += `<div class="report-nav">
+          <button class="rep-arrow" onclick="shiftReport(-1)">&#8249;</button>
+          <span class="report-period">${reportLabel(start, end)}</span>
+          <button class="rep-arrow" onclick="shiftReport(1)">&#8250;</button>
+        </div>
+        <div class="report-jump">
+          <span class="exp-label" style="margin:0">Jump to date</span>
+          <input type="date" class="auth-input" style="width:auto;margin:0" value="${dateKey(start)}" onchange="setReportDate(this.value)">
+        </div>`;
 
       if (!n) {
-        body.innerHTML = html + '<p class="modal-empty">No data in this period.</p>';
+        body.innerHTML = html + '<p class="modal-empty">No data logged in this period.</p>';
         return;
       }
 
+      const multi = reportType !== 'day';
       const rows = REPORT_ROWS.map(m => {
         const total = round(ds.reduce((s, d) => s + sumVal(d[m.f], m.sub), 0));
         return { label: m.label, total, avg: round(total / n), u: m.u };
       });
-      const workPeriods = ds.reduce((s, d) => s + (d.timer_periods || 0), 0);
-      const workMin = ds.reduce((s, d) => s + Math.floor((d.timer_total_work || 0) / 60), 0);
-      rows.push({ label: 'Work periods', total: workPeriods, avg: round(workPeriods / n), u: '' });
-      rows.push({ label: 'Work time', total: workMin, avg: round(workMin / n), u: 'min' });
+      const wp = ds.reduce((s, d) => s + (d.timer_periods || 0), 0);
+      const wm = ds.reduce((s, d) => s + Math.floor((d.timer_total_work || 0) / 60), 0);
+      rows.push({ label: 'Work periods', total: wp, avg: round(wp / n), u: '' });
+      rows.push({ label: 'Work time', total: wm, avg: round(wm / n), u: 'min' });
 
-      html += `<p class="auth-help">${periodLabel} · ${n} day${n > 1 ? 's' : ''} logged</p>`;
-      html += '<table class="history-table"><thead><tr><th>Metric</th><th>Total</th><th>Avg/day</th></tr></thead><tbody>';
+      html += `<p class="auth-help">${multi ? n + ' day' + (n > 1 ? 's' : '') + ' logged' : 'Daily summary'}</p>`;
+      html += '<table class="history-table"><thead><tr><th>Metric</th><th>Total</th>' + (multi ? '<th>Avg/day</th>' : '') + '</tr></thead><tbody>';
       rows.forEach(r => {
         const u = r.u ? ' ' + r.u : '';
-        html += `<tr><td>${r.label}</td><td>${r.total}${u}</td><td>${r.avg}${u}</td></tr>`;
+        html += `<tr><td>${r.label}</td><td>${r.total}${u}</td>` + (multi ? `<td>${r.avg}${u}</td>` : '') + `</tr>`;
       });
       html += '</tbody></table>';
       body.innerHTML = html;
