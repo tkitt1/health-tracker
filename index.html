@@ -857,6 +857,12 @@
     @media (max-width: 400px) {
       .card-grid { grid-template-columns: 1fr; }
     }
+
+    /* iOS zooms in on inputs with font-size < 16px, which pushes buttons off-screen.
+       Force 16px on touch/small screens to stop the zoom. */
+    @media (max-width: 768px) {
+      input, textarea, select { font-size: 16px !important; }
+    }
   </style>
 </head>
 <body>
