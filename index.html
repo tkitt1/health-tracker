@@ -994,12 +994,19 @@
         <button class="modal-close" onclick="closeAuth()">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="auth-help">Enter your email and we'll send a one-time sign-in link — no password. Use the same email on your phone and laptop to sync.</p>
+        <p class="auth-help">Enter your email and we'll send a 6-digit code (plus a magic link) — no password. On mobile, the <strong>code</strong> is the most reliable. Use the same email on every device to sync.</p>
         <input type="email" id="authEmail" class="auth-input" placeholder="email" autocomplete="email">
-        <div class="auth-msg" id="authMsg"></div>
         <div class="auth-actions">
-          <button class="if-btn if-start-btn" onclick="sendMagicLink()">Send Magic Link</button>
+          <button class="if-btn if-start-btn" onclick="sendMagicLink()">Send Code</button>
         </div>
+        <div id="otpStep" style="display:none; margin-top:14px">
+          <label class="exp-label">6-digit code from the email</label>
+          <input type="text" id="authCode" class="auth-input" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6">
+          <div class="auth-actions">
+            <button class="if-btn if-start-btn" onclick="verifyCode()">Verify &amp; Sign In</button>
+          </div>
+        </div>
+        <div class="auth-msg" id="authMsg"></div>
       </div>
     </div>
   </div>
@@ -1173,6 +1180,8 @@
     function openAuth() {
       const msg = document.getElementById('authMsg');
       msg.textContent = ''; msg.style.color = '';
+      document.getElementById('otpStep').style.display = 'none';
+      document.getElementById('authCode').value = '';
       document.getElementById('authOverlay').style.display = 'flex';
     }
     function closeAuth() { document.getElementById('authOverlay').style.display = 'none'; }
@@ -1181,14 +1190,26 @@
       const email = document.getElementById('authEmail').value.trim();
       const msg = document.getElementById('authMsg');
       if (!email) { msg.style.color = ''; msg.textContent = 'Enter your email first.'; return; }
-      msg.style.color = ''; msg.textContent = 'Sending link…';
+      msg.style.color = ''; msg.textContent = 'Sending…';
       const { error } = await sb.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: window.location.href.split('#')[0] }
       });
       if (error) { msg.textContent = error.message; return; }
+      document.getElementById('otpStep').style.display = 'block';
       msg.style.color = 'var(--green)';
-      msg.textContent = 'Check your inbox and tap the link to sign in. You can close this window.';
+      msg.textContent = 'Sent! Enter the 6-digit code from the email below (or tap the link on this device).';
+    }
+
+    async function verifyCode() {
+      const email = document.getElementById('authEmail').value.trim();
+      const token = document.getElementById('authCode').value.trim().replace(/\s/g, '');
+      const msg = document.getElementById('authMsg');
+      if (!token) { msg.style.color = ''; msg.textContent = 'Enter the code from the email.'; return; }
+      msg.style.color = ''; msg.textContent = 'Verifying…';
+      const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+      if (error) { msg.textContent = error.message; return; }
+      closeAuth();
     }
 
     async function doSignOut() { try { await sb.auth.signOut(); } catch (e) {} currentUser = null; updateAuthBar(); }
