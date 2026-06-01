@@ -24,6 +24,26 @@
       --radius: 12px;
     }
 
+    body.light {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --surface-hover: #eceef1;
+      --border: #d8dbe0;
+      --text: #1a1d27;
+      --text-muted: #6b7280;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.12);
+      --green: #16a34a;
+      --green-glow: rgba(22, 163, 74, 0.12);
+      --orange: #d97706;
+      --orange-glow: rgba(217, 119, 6, 0.12);
+      --red: #dc2626;
+      --blue: #2563eb;
+      --blue-glow: rgba(37, 99, 235, 0.12);
+    }
+    body.light input[type="datetime-local"],
+    body.light input[type="date"] { color-scheme: light; }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
@@ -47,7 +67,26 @@
     header {
       text-align: center;
       padding: 24px 0 32px;
+      position: relative;
     }
+
+    .theme-toggle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .theme-toggle:hover { background: var(--surface-hover); }
 
     header h1 {
       font-size: 1.75rem;
@@ -566,6 +605,7 @@
     .intake-left {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
@@ -895,6 +935,7 @@
 <body>
   <div class="container">
     <header>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light / dark">🌙</button>
       <h1>My Daily Performance Tracker</h1>
       <div class="date-nav">
         <button onclick="changeDate(-1)">&#8249;</button>
@@ -1427,6 +1468,22 @@
       render();
     }
 
+    // Edit the timestamp of the most recent entry (e.g. last coffee)
+    function toggleLastEdit(key) {
+      const el = document.getElementById(key + '_lastedit');
+      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+    function setLastTime(key, value) {
+      if (!value) return;
+      const ms = new Date(value).getTime();
+      if (isNaN(ms)) return;
+      const arr = getEntries(key);
+      if (!arr.length) return;
+      arr[arr.length - 1].t = ms;
+      setEntries(key, arr);
+      render();
+    }
+
     // Exercise (field entry)
     function renderExercises() {
       const grid = document.getElementById('exerciseGrid');
@@ -1502,7 +1559,12 @@
         let lastMeta = '';
         if (item.showLast && n) {
           const lastT = entries[entries.length - 1].t;
-          if (lastT) lastMeta = `<span class="intake-sub">last ${new Date(lastT).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>`;
+          if (lastT) lastMeta = `<span class="intake-sub">last ${new Date(lastT).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              <span class="view-link" style="margin-left:6px" onclick="toggleLastEdit('${item.key}')">edit</span>
+            </span>
+            <span class="intake-lastedit" id="${item.key}_lastedit" style="display:none; width:100%; margin-top:6px">
+              <input type="datetime-local" value="${toLocalInput(lastT)}" onchange="setLastTime('${item.key}', this.value)">
+            </span>`;
         }
         const itemField = item.withItem
           ? `<input type="text" class="protein-item-in" placeholder="what you ate" id="${item.key}_item_in"
@@ -2211,11 +2273,27 @@
       updateSoundBtn();
     }
 
+    // ---- Light / dark theme (per-device) ----
+    function updateThemeBtn() {
+      const b = document.getElementById('themeToggle');
+      if (b) b.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+    }
+    function applyTheme() {
+      if (localStorage.getItem('ht_theme') === 'light') document.body.classList.add('light');
+      updateThemeBtn();
+    }
+    function toggleTheme() {
+      const light = document.body.classList.toggle('light');
+      localStorage.setItem('ht_theme', light ? 'light' : 'dark');
+      updateThemeBtn();
+    }
+
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
 
+    applyTheme();
     render();
 
     // Keep the fasting elapsed/progress ticking live
