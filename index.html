@@ -875,6 +875,28 @@
     .report-period { font-weight: 600; font-size: 0.95rem; min-width: 150px; text-align: center; }
     .report-jump { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 
+    .report-detail-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin: 18px 0 10px;
+    }
+    .detail-group { margin-bottom: 14px; }
+    .detail-group-head { font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.8rem;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-when { color: var(--text-muted); white-space: nowrap; }
+    .detail-val { text-align: right; }
+
     /* History */
     .history-toggle {
       background: var(--surface);
@@ -2074,6 +2096,30 @@
       return String(start.getFullYear());
     }
 
+    function fmtDateShort(dk) {
+      return new Date(dk + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    // Flatten one metric's entries across the selected days, chronologically.
+    function metricEntries(key, days, ds) {
+      const out = [];
+      ds.forEach((d, i) => {
+        const arr = Array.isArray(d[key]) ? d[key] : [];
+        arr.forEach(e => out.push(Object.assign({ _date: days[i] }, e)));
+      });
+      out.sort((a, b) => (a.t || 0) - (b.t || 0));
+      return out;
+    }
+
+    function reportDetailGroups() {
+      return [
+        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} reps` })),
+        ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` })),
+        ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
+        ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` })),
+      ];
+    }
+
     function renderReport() {
       const types = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']];
       const { from, to, start, end } = reportRange();
@@ -2117,6 +2163,24 @@
         html += `<tr><td>${r.label}</td><td>${r.total}${u}</td>` + (multi ? `<td>${r.avg}${u}</td>` : '') + `</tr>`;
       });
       html += '</tbody></table>';
+
+      // ---- Detailed entry log (times, protein items, etc.) ----
+      html += '<div class="report-detail-title">Details</div>';
+      let anyDetail = false;
+      reportDetailGroups().forEach(g => {
+        const entries = metricEntries(g.key, days, ds);
+        if (!entries.length) return;
+        anyDetail = true;
+        html += `<div class="detail-group"><div class="detail-group-head">${g.icon} ${g.label}</div>`;
+        entries.forEach(e => {
+          const time = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+          const when = (multi ? fmtDateShort(e._date) + ' ' : '') + time;
+          html += `<div class="detail-row"><span class="detail-when">${when}</span><span class="detail-val">${g.fmt(e)}</span></div>`;
+        });
+        html += '</div>';
+      });
+      if (!anyDetail) html += '<p class="modal-empty">No timestamped entries in this period.</p>';
+
       body.innerHTML = html;
     }
 
