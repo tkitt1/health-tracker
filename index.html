@@ -968,6 +968,7 @@
     <!-- History -->
     <div class="section">
       <div class="history-actions">
+        <button class="history-toggle" onclick="openReport()">📊 Report</button>
         <button class="history-toggle" id="historyBtn" onclick="toggleHistory()">View History</button>
         <button class="history-toggle" onclick="exportCSV()">⬇ Export CSV</button>
       </div>
@@ -1032,6 +1033,17 @@
     </div>
   </div>
 
+  <!-- Report modal -->
+  <div class="modal-overlay" id="reportOverlay" style="display:none" onclick="if(event.target===this)closeReport()">
+    <div class="modal">
+      <div class="modal-header">
+        <span>📊 Report</span>
+        <button class="modal-close" onclick="closeReport()">&times;</button>
+      </div>
+      <div class="modal-body" id="reportBody"></div>
+    </div>
+  </div>
+
   <!-- Supabase client (cloud sync). App still works fully if this fails to load. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1069,6 +1081,26 @@
       '3 rounds — 1 min plank, 20 squats, 10 pushups',
       'Death by pushups — +1 rep each minute until you cap',
       '5 rounds — 30s sprint / 90s easy on the bike',
+    ];
+
+    const REPORT_ROWS = [
+      { label: 'Pushups', f: 'pushups', u: 'reps' },
+      { label: 'Squats', f: 'squats', u: 'reps' },
+      { label: 'Pull Ups', f: 'pullups', u: 'reps' },
+      { label: 'Dips', f: 'dips', u: 'reps' },
+      { label: 'Bike time', f: 'bike', sub: 'time', u: 'min' },
+      { label: 'Bike dist', f: 'bike', sub: 'dist', u: 'km' },
+      { label: 'Run time', f: 'run', sub: 'time', u: 'min' },
+      { label: 'Run dist', f: 'run', sub: 'dist', u: 'km' },
+      { label: 'Walk time', f: 'walk', sub: 'time', u: 'min' },
+      { label: 'Walk dist', f: 'walk', sub: 'dist', u: 'km' },
+      { label: 'Swim time', f: 'swim', sub: 'time', u: 'min' },
+      { label: 'Swim dist', f: 'swim', sub: 'dist', u: 'm' },
+      { label: 'Coffee', f: 'coffee', u: 'cups' },
+      { label: 'Creatine', f: 'creatine', u: 'g' },
+      { label: 'Protein', f: 'protein', u: 'g' },
+      { label: 'Meditation', f: 'meditation', u: 'min' },
+      { label: 'Reading', f: 'reading', u: 'min' },
     ];
 
     const MIND = [
@@ -1904,6 +1936,55 @@
       return Object.keys(localStorage)
         .filter(k => /^ht_\d{4}-\d{2}-\d{2}$/.test(k))
         .map(k => k.slice(3)).sort();
+    }
+
+    // ---- Report: totals + daily averages over a period ----
+    function openReport() {
+      document.getElementById('reportOverlay').style.display = 'flex';
+      renderReport(7);
+    }
+    function closeReport() { document.getElementById('reportOverlay').style.display = 'none'; }
+
+    function renderReport(days) {
+      const all = allDayKeys();
+      let keys = all, periodLabel = 'All time';
+      if (days > 0) {
+        const c = new Date(); c.setDate(c.getDate() - (days - 1));
+        const cutoff = dateKey(c);
+        keys = all.filter(d => d >= cutoff);
+        periodLabel = 'Last ' + days + ' days';
+      }
+      const ds = keys.map(d => JSON.parse(localStorage.getItem('ht_' + d) || '{}'));
+      const n = ds.length;
+      const body = document.getElementById('reportBody');
+
+      const periods = [{ d: 7, l: '7 days' }, { d: 30, l: '30 days' }, { d: 0, l: 'All' }];
+      let html = '<div class="goal-row">' + periods.map(p =>
+        `<button class="goal-btn${p.d === days ? ' active' : ''}" onclick="renderReport(${p.d})">${p.l}</button>`
+      ).join('') + '</div>';
+
+      if (!n) {
+        body.innerHTML = html + '<p class="modal-empty">No data in this period.</p>';
+        return;
+      }
+
+      const rows = REPORT_ROWS.map(m => {
+        const total = round(ds.reduce((s, d) => s + sumVal(d[m.f], m.sub), 0));
+        return { label: m.label, total, avg: round(total / n), u: m.u };
+      });
+      const workPeriods = ds.reduce((s, d) => s + (d.timer_periods || 0), 0);
+      const workMin = ds.reduce((s, d) => s + Math.floor((d.timer_total_work || 0) / 60), 0);
+      rows.push({ label: 'Work periods', total: workPeriods, avg: round(workPeriods / n), u: '' });
+      rows.push({ label: 'Work time', total: workMin, avg: round(workMin / n), u: 'min' });
+
+      html += `<p class="auth-help">${periodLabel} · ${n} day${n > 1 ? 's' : ''} logged</p>`;
+      html += '<table class="history-table"><thead><tr><th>Metric</th><th>Total</th><th>Avg/day</th></tr></thead><tbody>';
+      rows.forEach(r => {
+        const u = r.u ? ' ' + r.u : '';
+        html += `<tr><td>${r.label}</td><td>${r.total}${u}</td><td>${r.avg}${u}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      body.innerHTML = html;
     }
 
     // Open the export options dialog (date range / all)
