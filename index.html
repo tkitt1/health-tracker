@@ -970,13 +970,11 @@
         <button class="modal-close" onclick="closeAuth()">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="auth-help">Sign in to sync your data across devices. Use the same account on your phone and laptop.</p>
-        <input type="email" id="authEmail" class="auth-input" placeholder="email" autocomplete="username">
-        <input type="password" id="authPassword" class="auth-input" placeholder="password" autocomplete="current-password">
+        <p class="auth-help">Enter your email and we'll send a one-time sign-in link — no password. Use the same email on your phone and laptop to sync.</p>
+        <input type="email" id="authEmail" class="auth-input" placeholder="email" autocomplete="email">
         <div class="auth-msg" id="authMsg"></div>
         <div class="auth-actions">
-          <button class="if-btn if-start-btn" onclick="doSignIn()">Sign In</button>
-          <button class="if-btn if-reset-btn" onclick="doSignUp()">Create Account</button>
+          <button class="if-btn if-start-btn" onclick="sendMagicLink()">Send Magic Link</button>
         </div>
       </div>
     </div>
@@ -1127,27 +1125,25 @@
       }
     }
 
-    function openAuth() { document.getElementById('authMsg').textContent = ''; document.getElementById('authOverlay').style.display = 'flex'; }
+    function openAuth() {
+      const msg = document.getElementById('authMsg');
+      msg.textContent = ''; msg.style.color = '';
+      document.getElementById('authOverlay').style.display = 'flex';
+    }
     function closeAuth() { document.getElementById('authOverlay').style.display = 'none'; }
 
-    async function doSignIn() {
+    async function sendMagicLink() {
       const email = document.getElementById('authEmail').value.trim();
-      const password = document.getElementById('authPassword').value;
       const msg = document.getElementById('authMsg');
-      msg.textContent = 'Signing in…';
-      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (!email) { msg.style.color = ''; msg.textContent = 'Enter your email first.'; return; }
+      msg.style.color = ''; msg.textContent = 'Sending link…';
+      const { error } = await sb.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.href.split('#')[0] }
+      });
       if (error) { msg.textContent = error.message; return; }
-      closeAuth();
-    }
-
-    async function doSignUp() {
-      const email = document.getElementById('authEmail').value.trim();
-      const password = document.getElementById('authPassword').value;
-      const msg = document.getElementById('authMsg');
-      msg.textContent = 'Creating account…';
-      const { error } = await sb.auth.signUp({ email, password });
-      if (error) { msg.textContent = error.message; return; }
-      msg.textContent = 'Account created. If email confirmation is on, check your inbox, then sign in.';
+      msg.style.color = 'var(--green)';
+      msg.textContent = 'Check your inbox and tap the link to sign in. You can close this window.';
     }
 
     async function doSignOut() { try { await sb.auth.signOut(); } catch (e) {} currentUser = null; updateAuthBar(); }
