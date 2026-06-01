@@ -728,6 +728,12 @@
     .if-btn:hover { filter: brightness(1.1); }
     .if-start-btn { background: var(--green); color: white; }
     .if-end-btn { background: var(--orange); color: white; }
+    .if-restart-btn {
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .if-elapsed.reached { font-size: 1.4rem; color: var(--green); }
     .if-reset-btn {
       background: var(--surface-hover);
       color: var(--text);
@@ -1451,6 +1457,10 @@
     function ifStartNow() { const o = getIF(); o.start = Date.now(); o.end = null; saveIF(o); renderIF(); }
     function ifEndNow() { const o = getIF(); if (!o.start) return; o.end = Date.now(); saveIF(o); renderIF(); }
     function ifReset() { const o = getIF(); o.start = null; o.end = null; saveIF(o); renderIF(); }
+    function ifRestart() {
+      if (!confirm('Ate something? This restarts your fast from right now.')) return;
+      const o = getIF(); o.start = Date.now(); o.end = null; saveIF(o); renderIF();
+    }
     function setGoal(h) { const o = getIF(); o.goalH = h; saveIF(o); renderIF(); }
     function setGoalDays() {
       const v = parseFloat(document.getElementById('ifDays').value) || 0;
@@ -1485,6 +1495,7 @@
         body = `
           <div class="if-status">
             <div class="if-elapsed" id="ifElapsed">--</div>
+            <div class="if-meta" id="ifCountLabel">remaining until ${goalH}h goal</div>
             <div class="if-bar"><div class="if-fill" id="ifFill" style="width:0%"></div></div>
             <div class="if-meta" id="ifRemaining"></div>
             <div class="if-meta">Started ${fmtClock(o.start)}</div>
@@ -1492,6 +1503,7 @@
           ${goalRow}
           <div class="if-controls">
             <button class="if-btn if-end-btn" onclick="ifEndNow()">End Fast</button>
+            <button class="if-btn if-restart-btn" onclick="ifRestart()">Ate · Restart</button>
             <button class="if-btn if-reset-btn" onclick="ifReset()">Reset</button>
           </div>`;
       } else {
@@ -1515,19 +1527,28 @@
       const o = getIF();
       const elapsedEl = document.getElementById('ifElapsed');
       if (!o.start || o.end || !elapsedEl) return; // only ticks while actively fasting
-      const goalMs = (o.goalH || 16) * 3600000;
+      const goalH = o.goalH || 16;
+      const goalMs = goalH * 3600000;
       const elapsed = Date.now() - o.start;
-      elapsedEl.textContent = fmtDur(elapsed, true);
+      const remaining = goalMs - elapsed;
       const fill = document.getElementById('ifFill');
       const rem = document.getElementById('ifRemaining');
+      const label = document.getElementById('ifCountLabel');
+
+      if (remaining > 0) {
+        elapsedEl.textContent = fmtDur(remaining, true);   // count DOWN to goal
+        elapsedEl.classList.remove('reached');
+        if (label) label.textContent = `remaining until ${goalH}h goal`;
+        if (rem) rem.textContent = `${fmtDur(elapsed)} elapsed`;
+      } else {
+        elapsedEl.textContent = '🎉 Goal reached';
+        elapsedEl.classList.add('reached');
+        if (label) label.textContent = `${goalH}h goal complete`;
+        if (rem) rem.textContent = `${fmtDur(-remaining)} past goal · ${fmtDur(elapsed)} total`;
+      }
       if (fill) {
         fill.style.width = Math.min(100, elapsed / goalMs * 100) + '%';
         fill.classList.toggle('done', elapsed >= goalMs);
-      }
-      if (rem) {
-        rem.textContent = elapsed >= goalMs
-          ? `🎉 Goal reached — ${fmtDur(elapsed - goalMs)} over`
-          : `${fmtDur(goalMs - elapsed)} to ${o.goalH || 16}h goal`;
       }
     }
 
