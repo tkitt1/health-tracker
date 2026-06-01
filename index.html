@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Health Tracker</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-hover: #222632;
+      --border: #2a2e3a;
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --green: #22c55e;
+      --green-glow: rgba(34, 197, 94, 0.15);
+      --orange: #f59e0b;
+      --orange-glow: rgba(245, 158, 11, 0.15);
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --blue-glow: rgba(59, 130, 246, 0.15);
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      padding: 24px 0 32px;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .date-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .date-nav button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .date-nav button:hover { background: var(--surface-hover); }
+
+    .date-nav .date-display {
+      font-size: 1rem;
+      color: var(--text-muted);
+      min-width: 160px;
+      text-align: center;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      padding-left: 4px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: border-color 0.15s;
+    }
+
+    .card:hover { border-color: #3a3e4a; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .card-icon {
+      font-size: 1.2rem;
+    }
+
+    .card-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .counter {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .counter button {
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .counter button:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .counter .count {
+      font-size: 1.5rem;
+      font-weight: 700;
+      min-width: 48px;
+      text-align: center;
+    }
+
+    .time-distance {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-row label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      min-width: 52px;
+    }
+
+    input[type="number"], input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.9rem;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    /* No spinner arrows — type values directly */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    /* Accumulating add-row (cardio + mind) */
+    .total-line {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .total-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .total-unit {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .total-sep {
+      color: var(--border);
+      margin: 0 2px;
+    }
+
+    .add-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .add-row input {
+      width: 100%;
+      min-width: 0;
+      padding: 6px 8px;
+      font-size: 0.85rem;
+    }
+
+    .add-btn {
+      background: var(--green-glow);
+      border: 1px solid var(--green);
+      color: var(--green);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .add-btn:hover {
+      background: var(--green);
+      color: white;
+    }
+
+    /* Edit / view link */
+    .view-link {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--accent);
+      cursor: pointer;
+      user-select: none;
+    }
+    .view-link:hover { text-decoration: underline; }
+
+    .intake-total { margin-left: 10px; }
+    .intake-add { flex: 0 0 auto; }
+    .intake-add input { width: 80px; }
+    .intake-add input.protein-item-in { width: 130px; }
+    .intake-add .view-link { margin-left: 4px; }
+    .intake-sub {
+      display: block;
+      width: 100%;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      padding-left: 28px;
+    }
+
+    /* Protein item text in the edit modal */
+    .entry-row input.entry-item-input {
+      flex: 1;
+      width: auto;
+      min-width: 60px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 0.85rem;
+    }
+
+    /* Workout ideas */
+    .workout-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .workout-controls { margin-bottom: 12px; }
+    .workout-btn { font-size: 0.9rem; padding: 10px 18px; }
+    .workout-suggestion {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+      flex-wrap: wrap;
+    }
+    .workout-suggestion .view-link { margin-left: 0; }
+    .workout-notes {
+      width: 100%;
+      min-height: 90px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+    }
+    .workout-notes:focus { border-color: var(--accent); }
+
+    /* Entries modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 440px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body {
+      padding: 8px 16px 16px;
+      overflow-y: auto;
+    }
+    .modal-empty {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 20px;
+      font-size: 0.85rem;
+    }
+    .entry-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .entry-row:last-child { border-bottom: none; }
+    .entry-time {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      min-width: 60px;
+    }
+    .entry-input {
+      width: 68px;
+      padding: 5px 8px;
+      font-size: 0.85rem;
+    }
+    .entry-u {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .entry-del {
+      margin-left: auto;
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      color: var(--red);
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .entry-del:hover { background: var(--red); color: white; }
+
+    /* Work Timer */
+    .timer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .timer-display {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .timer-time {
+      font-size: 3rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    .timer-phase {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .timer-phase.work { color: var(--green); }
+    .timer-phase.short-break { color: var(--orange); }
+    .timer-phase.long-break { color: var(--blue); }
+
+    .timer-controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .timer-controls button {
+      padding: 8px 24px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .timer-controls button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .timer-phase.paused {
+      color: var(--orange);
+      font-weight: 700;
+    }
+
+    .btn-start {
+      background: var(--green);
+      color: white;
+    }
+    .btn-start:hover { filter: brightness(1.1); }
+
+    .btn-pause {
+      background: var(--orange);
+      color: white;
+    }
+
+    .btn-reset {
+      background: var(--surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border) !important;
+    }
+
+    .btn-skip {
+      background: var(--surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border) !important;
+    }
+
+    .timer-stats {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    .timer-stat {
+      text-align: center;
+    }
+
+    .timer-stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .timer-stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: var(--bg);
+      border-radius: 2px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 1s linear;
+    }
+
+    .progress-fill.work { background: var(--green); }
+    .progress-fill.short-break { background: var(--orange); }
+    .progress-fill.long-break { background: var(--blue); }
+
+    /* Intake tracker */
+    .intake-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+    }
+
+    .intake-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .intake-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .intake-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .intake-controls button {
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .intake-controls button:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .intake-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      min-width: 32px;
+      text-align: center;
+    }
+
+    .intake-unit {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* IF Tracker */
+    .if-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .if-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .if-row:last-child { margin-bottom: 0; }
+
+    .if-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      min-width: 100px;
+    }
+
+    .if-value {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    input[type="datetime-local"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      outline: none;
+      color-scheme: dark;
+    }
+
+    input[type="datetime-local"]:focus { border-color: var(--accent); }
+
+    /* IF live tracker */
+    .if-status { margin-bottom: 14px; }
+    .if-elapsed {
+      font-size: 2.1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      margin: 4px 0;
+    }
+    .if-bar {
+      width: 100%;
+      height: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .if-fill {
+      height: 100%;
+      background: var(--blue);
+      border-radius: 4px;
+      transition: width 0.5s linear;
+    }
+    .if-fill.done { background: var(--green); }
+    .if-meta { font-size: 0.8rem; color: var(--text-muted); }
+
+    .goal-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .goal-sep { color: var(--text-muted); font-size: 0.8rem; margin: 0 2px; }
+    .goal-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .goal-btn:hover { border-color: var(--accent); }
+    .goal-btn.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .goal-row input.if-days {
+      width: 70px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .goal-row input.if-days:focus { border-color: var(--accent); }
+
+    .if-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .if-btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .if-btn:hover { filter: brightness(1.1); }
+    .if-start-btn { background: var(--green); color: white; }
+    .if-end-btn { background: var(--orange); color: white; }
+    .if-reset-btn {
+      background: var(--surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* Mind section */
+    .mind-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .mind-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .mind-card .card-header {
+      margin-bottom: 8px;
+    }
+
+    .mind-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mind-input input {
+      width: 80px;
+    }
+
+    .mind-unit {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* History */
+    .history-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      width: 100%;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .history-toggle:hover { background: var(--surface-hover); }
+
+    .history-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .history-actions .history-toggle { margin-top: 0; }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.8rem;
+    }
+
+    .history-table th {
+      text-align: left;
+      padding: 8px 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    @media (max-width: 600px) {
+      .card-grid { grid-template-columns: 1fr 1fr; }
+      .mind-grid { grid-template-columns: 1fr; }
+      .timer-time { font-size: 2.5rem; }
+    }
+
+    @media (max-width: 400px) {
+      .card-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Daily Health Tracker</h1>
+      <div class="date-nav">
+        <button onclick="changeDate(-1)">&#8249;</button>
+        <span class="date-display" id="dateDisplay"></span>
+        <button onclick="changeDate(1)">&#8250;</button>
+      </div>
+    </header>
+
+    <!-- Exercise Counters -->
+    <div class="section">
+      <div class="section-title">Exercise</div>
+      <div class="card-grid" id="exerciseGrid"></div>
+    </div>
+
+    <!-- Cardio -->
+    <div class="section">
+      <div class="section-title">Cardio</div>
+      <div class="card-grid" id="cardioGrid"></div>
+    </div>
+
+    <!-- Work Timer (Pomodoro-style) -->
+    <div class="section">
+      <div class="section-title">Work Timer</div>
+      <div class="timer-card">
+        <div class="timer-display">
+          <div class="timer-time" id="timerDisplay">30:00</div>
+          <div class="progress-bar">
+            <div class="progress-fill work" id="progressFill" style="width: 0%"></div>
+          </div>
+          <div class="timer-phase work" id="timerPhase">Work Period</div>
+        </div>
+        <div class="timer-controls">
+          <button class="btn-start" id="timerStartBtn" onclick="startTimer()">Start</button>
+          <button class="btn-pause" id="timerPauseBtn" onclick="pauseTimer()" disabled>Pause</button>
+          <button class="btn-skip" onclick="skipPhase()">Skip</button>
+          <button class="btn-reset" onclick="resetTimer()">Reset</button>
+          <button class="btn-skip" id="soundBtn" onclick="toggleSound()" title="Toggle sound">🔊</button>
+        </div>
+        <div class="timer-stats">
+          <div class="timer-stat">
+            <div class="timer-stat-value" id="workPeriods">0</div>
+            <div class="timer-stat-label">Work Periods</div>
+          </div>
+          <div class="timer-stat">
+            <div class="timer-stat-value" id="totalWorkTime">0m</div>
+            <div class="timer-stat-label">Total Work</div>
+          </div>
+          <div class="timer-stat">
+            <div class="timer-stat-value" id="cycleCount">0 / 4</div>
+            <div class="timer-stat-label">Until Long Break</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Intake -->
+    <div class="section">
+      <div class="section-title">Intake</div>
+      <div id="intakeSection"></div>
+    </div>
+
+    <!-- Intermittent Fasting -->
+    <div class="section">
+      <div class="section-title">Intermittent Fasting</div>
+      <div class="if-card" id="ifCard"></div>
+    </div>
+
+    <!-- Mind -->
+    <div class="section">
+      <div class="section-title">Mind</div>
+      <div class="mind-grid" id="mindGrid"></div>
+    </div>
+
+    <!-- Workout Ideas -->
+    <div class="section">
+      <div class="section-title">Workout Ideas</div>
+      <div class="workout-card">
+        <div class="workout-controls">
+          <button class="add-btn workout-btn" onclick="randomWorkout()">🎲 Random Workout</button>
+        </div>
+        <div class="workout-suggestion" id="workoutSuggestion" style="display:none">
+          <span id="workoutText"></span>
+          <button class="view-link" onclick="logWorkout()">＋ add to notes</button>
+        </div>
+        <textarea id="workoutNotes" class="workout-notes" placeholder="Workout notes for the day…"
+          onchange="saveField('workout_notes', this.value)"></textarea>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="section">
+      <div class="history-actions">
+        <button class="history-toggle" onclick="toggleHistory()">View History</button>
+        <button class="history-toggle" onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
+      <div id="historyContainer" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Entries modal -->
+  <div class="modal-overlay" id="modalOverlay" style="display:none" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="modalTitle"></span>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const EXERCISES = [
+      { key: 'pushups', label: 'Pushups', icon: '💪' },
+      { key: 'pullups', label: 'Pull Ups', icon: '🏋️' },
+      { key: 'dips', label: 'Dips', icon: '🔻' },
+      { key: 'squats', label: 'Squats', icon: '🦵' },
+    ];
+
+    const CARDIO = [
+      { key: 'bike', label: 'Bike', icon: '🚴', distUnit: 'km', distStep: '0.1' },
+      { key: 'run', label: 'Run', icon: '🏃', distUnit: 'km', distStep: '0.1' },
+      { key: 'walk', label: 'Walk', icon: '🚶', distUnit: 'km', distStep: '0.1' },
+      { key: 'swim', label: 'Swim', icon: '🏊', distUnit: 'm', distStep: '10' },
+    ];
+
+    const INTAKE = [
+      { key: 'coffee', label: 'Coffee', icon: '☕', unit: 'cups', showLast: true },
+      { key: 'creatine', label: 'Creatine', icon: '💊', unit: 'g' },
+      { key: 'protein', label: 'Protein', icon: '🥩', unit: 'g', withItem: true },
+    ];
+
+    const WORKOUTS = [
+      '3 rounds — 15 pushups, 20 squats, 10 dips',
+      '5 rounds — 10 pullups, 15 pushups',
+      'EMOM 10 min — 8 pushups + 12 squats each minute',
+      'Tabata squats — 20s on / 10s off × 8 rounds',
+      '100 pushups spread through the day',
+      '4 rounds — 20 squats, 10 dips, 30s plank',
+      'Pyramid pushups — 1,2,3…10, then back down',
+      '20 min walk + 30 squats every 5 min',
+      '50 squats, 40 pushups, 30 dips, 20 pullups, 10 burpees',
+      '3 rounds — 1 min plank, 20 squats, 10 pushups',
+      'Death by pushups — +1 rep each minute until you cap',
+      '5 rounds — 30s sprint / 90s easy on the bike',
+    ];
+
+    const MIND = [
+      { key: 'meditation', label: 'Meditation', icon: '🧘' },
+      { key: 'reading', label: 'Reading', icon: '📖' },
+    ];
+
+    const WORK_DURATION = 30 * 60;
+    const SHORT_BREAK = 4 * 60;
+    const LONG_BREAK = 15 * 60;
+    const PERIODS_BEFORE_LONG = 4;
+
+    let currentDate = new Date();
+    let timerInterval = null;
+    let timerSeconds = WORK_DURATION;
+    let timerRunning = false;
+    let timerStarted = false; // a period is in progress (started, not yet completed/reset)
+    let timerPhase = 'work';
+    let periodsCompleted = 0;
+    let totalWorkSeconds = 0;
+
+    // ---- Audio alerts for the work timer ----
+    let audioCtx = null;
+    let soundEnabled = localStorage.getItem('ht_sound') !== 'off';
+
+    function initAudio() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { audioCtx = null; }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function beep(freq, startOffset, duration, vol) {
+      if (!audioCtx) return;
+      const t0 = audioCtx.currentTime + startOffset;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(vol, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.02);
+    }
+
+    // backToWork=true -> a break just ended (energizing rising chime)
+    // backToWork=false -> a work period just ended (gentle falling chime)
+    function playAlert(backToWork) {
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+      if (backToWork) {
+        beep(523, 0,    0.16, 0.3);
+        beep(659, 0.18, 0.16, 0.3);
+        beep(880, 0.36, 0.32, 0.35);
+      } else {
+        beep(784, 0,    0.22, 0.3);
+        beep(523, 0.24, 0.42, 0.3);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('ht_sound', soundEnabled ? 'on' : 'off');
+      updateSoundBtn();
+      if (soundEnabled) { initAudio(); playAlert(true); } // confirm + unlock audio
+    }
+
+    function updateSoundBtn() {
+      const btn = document.getElementById('soundBtn');
+      if (btn) {
+        btn.textContent = soundEnabled ? '🔊' : '🔇';
+        btn.title = soundEnabled ? 'Sound on — click to mute' : 'Muted — click to enable sound';
+      }
+    }
+
+    function round(n) {
+      return Math.round((parseFloat(n) || 0) * 100) / 100;
+    }
+
+    function dateKey(d) {
+      const dt = d || currentDate;
+      return dt.getFullYear() + '-' +
+        String(dt.getMonth() + 1).padStart(2, '0') + '-' +
+        String(dt.getDate()).padStart(2, '0');
+    }
+
+    function isToday() {
+      return dateKey() === dateKey(new Date());
+    }
+
+    function getData() {
+      const key = 'ht_' + dateKey();
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : {};
+    }
+
+    function saveData(data) {
+      localStorage.setItem('ht_' + dateKey(), JSON.stringify(data));
+    }
+
+    function getField(field, fallback) {
+      const data = getData();
+      return data[field] !== undefined ? data[field] : fallback;
+    }
+
+    function saveField(field, value) {
+      const data = getData();
+      data[field] = value;
+      saveData(data);
+    }
+
+    function changeDate(offset) {
+      currentDate.setDate(currentDate.getDate() + offset);
+      render();
+    }
+
+    function formatDate(d) {
+      const today = new Date();
+      if (dateKey(d) === dateKey(today)) return 'Today';
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (dateKey(d) === dateKey(yesterday)) return 'Yesterday';
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    // ---- Entry model: each additive metric stores an array of timestamped entries ----
+    function genId() {
+      return 'e' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    }
+
+    function getEntries(key) {
+      const v = getData()[key];
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'number' && v) return [{ id: 'legacy', t: 0, v: v }]; // migrate old totals
+      return [];
+    }
+
+    function setEntries(key, arr) {
+      const data = getData();
+      data[key] = arr;
+      saveData(data);
+    }
+
+    function sumEntries(key, field) {
+      return round(getEntries(key).reduce((s, e) => s + (parseFloat(field ? e[field] : e.v) || 0), 0));
+    }
+
+    function sumVal(v, field) {
+      if (Array.isArray(v)) return round(v.reduce((s, e) => s + (parseFloat(field ? e[field] : e.v) || 0), 0));
+      return round(v || 0);
+    }
+
+    function metaFor(key) {
+      return [...EXERCISES, ...CARDIO, ...INTAKE, ...MIND].find(m => m.key === key) || { label: key, icon: '' };
+    }
+
+    function addCount(key) {
+      const el = document.getElementById(key + '_in');
+      const v = parseFloat(el.value) || 0;
+      if (v <= 0) return;
+      const entry = { id: genId(), t: Date.now(), v: round(v) };
+      const itemEl = document.getElementById(key + '_item_in'); // optional "what you ate" field
+      if (itemEl && itemEl.value.trim()) entry.item = itemEl.value.trim();
+      const arr = getEntries(key);
+      arr.push(entry);
+      setEntries(key, arr);
+      render();
+    }
+
+    // Exercise (field entry)
+    function renderExercises() {
+      const grid = document.getElementById('exerciseGrid');
+      grid.innerHTML = EXERCISES.map(ex => {
+        const total = sumEntries(ex.key);
+        const n = getEntries(ex.key).length;
+        return `
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">${ex.icon}</span>
+              <span class="card-label">${ex.label}</span>
+              <span class="view-link" onclick="openEntries('${ex.key}','count')">edit${n ? ` (${n})` : ''}</span>
+            </div>
+            <div class="total-line">
+              <span class="total-value">${total}</span><span class="total-unit">reps</span>
+            </div>
+            <div class="add-row">
+              <input type="number" min="0" placeholder="+ reps" id="${ex.key}_in"
+                onkeydown="if(event.key==='Enter')addCount('${ex.key}')">
+              <button class="add-btn" onclick="addCount('${ex.key}')">Add</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // Cardio (field entry, km)
+    function renderCardio() {
+      const grid = document.getElementById('cardioGrid');
+      grid.innerHTML = CARDIO.map(c => {
+        const time = sumEntries(c.key, 'time');
+        const dist = sumEntries(c.key, 'dist');
+        const n = getEntries(c.key).length;
+        return `
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">${c.icon}</span>
+              <span class="card-label">${c.label}</span>
+              <span class="view-link" onclick="openEntries('${c.key}','cardio')">edit${n ? ` (${n})` : ''}</span>
+            </div>
+            <div class="total-line">
+              <span class="total-value">${time}</span><span class="total-unit">min</span>
+              <span class="total-sep">·</span>
+              <span class="total-value">${dist}</span><span class="total-unit">${c.distUnit}</span>
+            </div>
+            <div class="add-row">
+              <input type="number" min="0" placeholder="+ min" id="${c.key}_time_in">
+              <input type="number" min="0" step="${c.distStep}" placeholder="+ ${c.distUnit}" id="${c.key}_dist_in">
+              <button class="add-btn" onclick="addCardio('${c.key}')">Add</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function addCardio(key) {
+      const timeEl = document.getElementById(key + '_time_in');
+      const distEl = document.getElementById(key + '_dist_in');
+      const addTime = parseFloat(timeEl.value) || 0;
+      const addDist = parseFloat(distEl.value) || 0;
+      if (addTime <= 0 && addDist <= 0) return;
+      const arr = getEntries(key);
+      arr.push({ id: genId(), t: Date.now(), time: round(addTime), dist: round(addDist) });
+      setEntries(key, arr);
+      render();
+    }
+
+    // Intake (field entry)
+    function renderIntake() {
+      const section = document.getElementById('intakeSection');
+      section.innerHTML = INTAKE.map(item => {
+        const entries = getEntries(item.key);
+        const total = sumEntries(item.key);
+        const n = entries.length;
+        let lastMeta = '';
+        if (item.showLast && n) {
+          const lastT = entries[entries.length - 1].t;
+          if (lastT) lastMeta = `<span class="intake-sub">last ${new Date(lastT).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>`;
+        }
+        const itemField = item.withItem
+          ? `<input type="text" class="protein-item-in" placeholder="what you ate" id="${item.key}_item_in"
+               onkeydown="if(event.key==='Enter')addCount('${item.key}')">`
+          : '';
+        return `
+          <div class="intake-row">
+            <div class="intake-left">
+              <span class="card-icon">${item.icon}</span>
+              <span class="intake-label">${item.label}</span>
+              <span class="intake-total"><span class="total-value">${total}</span> <span class="total-unit">${item.unit}</span></span>
+              ${lastMeta}
+            </div>
+            <div class="add-row intake-add">
+              <input type="number" min="0" placeholder="+ ${item.unit}" id="${item.key}_in"
+                onkeydown="if(event.key==='Enter')addCount('${item.key}')">
+              ${itemField}
+              <button class="add-btn" onclick="addCount('${item.key}')">Add</button>
+              <span class="view-link" onclick="openEntries('${item.key}','count')">edit${n ? ` (${n})` : ''}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // IF
+    // ---- Intermittent Fasting (live tracker; stored globally so it survives midnight) ----
+    function getIF() {
+      try { return JSON.parse(localStorage.getItem('ht_if') || '{}'); } catch (e) { return {}; }
+    }
+    function saveIF(o) { localStorage.setItem('ht_if', JSON.stringify(o)); }
+
+    function fmtDur(ms, withSec) {
+      if (ms < 0) ms = 0;
+      const total = Math.floor(ms / 1000);
+      const d = Math.floor(total / 86400);
+      const h = Math.floor((total % 86400) / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      if (d > 0) return `${d}d ${h}h ${m}m`;
+      if (withSec) return `${h}h ${m}m ${s}s`;
+      return `${h}h ${m}m`;
+    }
+    function fmtClock(ms) {
+      return new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function ifStartNow() { const o = getIF(); o.start = Date.now(); o.end = null; saveIF(o); renderIF(); }
+    function ifEndNow() { const o = getIF(); if (!o.start) return; o.end = Date.now(); saveIF(o); renderIF(); }
+    function ifReset() { const o = getIF(); o.start = null; o.end = null; saveIF(o); renderIF(); }
+    function setGoal(h) { const o = getIF(); o.goalH = h; saveIF(o); renderIF(); }
+    function setGoalDays() {
+      const v = parseFloat(document.getElementById('ifDays').value) || 0;
+      if (v <= 0) return;
+      const o = getIF(); o.goalH = round(v * 24); saveIF(o); renderIF();
+    }
+
+    function renderIF() {
+      const o = getIF();
+      const goalH = o.goalH || 16;
+      const presets = [16, 18, 20, 24];
+      const days = goalH > 24 ? round(goalH / 24) : '';
+      const goalRow = `
+        <div class="goal-row">
+          <span class="if-meta">Goal</span>
+          ${presets.map(h => `<button class="goal-btn${goalH === h ? ' active' : ''}" onclick="setGoal(${h})">${h}h</button>`).join('')}
+          <span class="goal-sep">or</span>
+          <input type="number" min="1" step="1" class="if-days" id="ifDays" placeholder="days"
+            value="${days}" onchange="setGoalDays()">
+          <span class="if-meta">days</span>
+        </div>`;
+
+      let body;
+      if (!o.start) {
+        body = `
+          <div class="if-status"><span class="if-meta">Not currently fasting.</span></div>
+          ${goalRow}
+          <div class="if-controls">
+            <button class="if-btn if-start-btn" onclick="ifStartNow()">Start Now</button>
+          </div>`;
+      } else if (!o.end) {
+        body = `
+          <div class="if-status">
+            <div class="if-elapsed" id="ifElapsed">--</div>
+            <div class="if-bar"><div class="if-fill" id="ifFill" style="width:0%"></div></div>
+            <div class="if-meta" id="ifRemaining"></div>
+            <div class="if-meta">Started ${fmtClock(o.start)}</div>
+          </div>
+          ${goalRow}
+          <div class="if-controls">
+            <button class="if-btn if-end-btn" onclick="ifEndNow()">End Fast</button>
+            <button class="if-btn if-reset-btn" onclick="ifReset()">Reset</button>
+          </div>`;
+      } else {
+        body = `
+          <div class="if-status">
+            <span class="if-meta">Last completed fast</span>
+            <div class="if-elapsed">${fmtDur(o.end - o.start)}</div>
+            <div class="if-meta">${fmtClock(o.start)} &rarr; ${fmtClock(o.end)}</div>
+          </div>
+          ${goalRow}
+          <div class="if-controls">
+            <button class="if-btn if-start-btn" onclick="ifStartNow()">Start Now</button>
+            <button class="if-btn if-reset-btn" onclick="ifReset()">Reset</button>
+          </div>`;
+      }
+      document.getElementById('ifCard').innerHTML = body;
+      updateIFLive();
+    }
+
+    function updateIFLive() {
+      const o = getIF();
+      const elapsedEl = document.getElementById('ifElapsed');
+      if (!o.start || o.end || !elapsedEl) return; // only ticks while actively fasting
+      const goalMs = (o.goalH || 16) * 3600000;
+      const elapsed = Date.now() - o.start;
+      elapsedEl.textContent = fmtDur(elapsed, true);
+      const fill = document.getElementById('ifFill');
+      const rem = document.getElementById('ifRemaining');
+      if (fill) {
+        fill.style.width = Math.min(100, elapsed / goalMs * 100) + '%';
+        fill.classList.toggle('done', elapsed >= goalMs);
+      }
+      if (rem) {
+        rem.textContent = elapsed >= goalMs
+          ? `🎉 Goal reached — ${fmtDur(elapsed - goalMs)} over`
+          : `${fmtDur(goalMs - elapsed)} to ${o.goalH || 16}h goal`;
+      }
+    }
+
+    // Mind (field entry)
+    function renderMind() {
+      const grid = document.getElementById('mindGrid');
+      grid.innerHTML = MIND.map(m => {
+        const total = sumEntries(m.key);
+        const n = getEntries(m.key).length;
+        return `
+          <div class="mind-card">
+            <div class="card-header">
+              <span class="card-icon">${m.icon}</span>
+              <span class="card-label">${m.label}</span>
+              <span class="view-link" onclick="openEntries('${m.key}','count')">edit${n ? ` (${n})` : ''}</span>
+            </div>
+            <div class="total-line">
+              <span class="total-value">${total}</span><span class="total-unit">min total</span>
+            </div>
+            <div class="add-row">
+              <input type="number" min="0" placeholder="+ min" id="${m.key}_in"
+                onkeydown="if(event.key==='Enter')addCount('${m.key}')">
+              <button class="add-btn" onclick="addCount('${m.key}')">Add</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ---- Workout ideas + daily notes ----
+    let lastWorkout = null;
+
+    function randomWorkout() {
+      let pick;
+      do { pick = WORKOUTS[Math.floor(Math.random() * WORKOUTS.length)]; }
+      while (WORKOUTS.length > 1 && pick === lastWorkout);
+      lastWorkout = pick;
+      document.getElementById('workoutText').textContent = pick;
+      document.getElementById('workoutSuggestion').style.display = 'flex';
+    }
+
+    function logWorkout() {
+      const txt = document.getElementById('workoutText').textContent;
+      if (!txt) return;
+      const ta = document.getElementById('workoutNotes');
+      ta.value = (ta.value ? ta.value + '\n' : '') + '• ' + txt;
+      saveField('workout_notes', ta.value);
+    }
+
+    function renderWorkout() {
+      document.getElementById('workoutNotes').value = getField('workout_notes', '');
+      document.getElementById('workoutSuggestion').style.display = 'none';
+    }
+
+    // ---- Entries modal (view / edit / delete individual entries) ----
+    let modalKey = null, modalType = null;
+
+    function openEntries(key, type) {
+      modalKey = key; modalType = type;
+      const meta = metaFor(key);
+      document.getElementById('modalTitle').textContent =
+        (meta.icon ? meta.icon + ' ' : '') + meta.label + ' — entries';
+      renderModalBody();
+      document.getElementById('modalOverlay').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').style.display = 'none';
+      modalKey = null; modalType = null;
+    }
+
+    function renderModalBody() {
+      const arr = getEntries(modalKey);
+      const body = document.getElementById('modalBody');
+      if (!arr.length) {
+        body.innerHTML = '<p class="modal-empty">No entries yet for this day.</p>';
+        return;
+      }
+      const distUnit = (metaFor(modalKey).distUnit) || 'km';
+      const distStep = (metaFor(modalKey).distStep) || '0.1';
+      const withItem = metaFor(modalKey).withItem;
+      body.innerHTML = arr.map(e => {
+        const t = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+        if (modalType === 'cardio') {
+          return `<div class="entry-row">
+            <span class="entry-time">${t}</span>
+            <input type="number" min="0" class="entry-input" value="${e.time || 0}"
+              onchange="updateEntry('${e.id}','time',this.value)"><span class="entry-u">min</span>
+            <input type="number" min="0" step="${distStep}" class="entry-input" value="${e.dist || 0}"
+              onchange="updateEntry('${e.id}','dist',this.value)"><span class="entry-u">${distUnit}</span>
+            <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
+          </div>`;
+        }
+        const itemInput = withItem
+          ? `<input type="text" class="entry-item-input" placeholder="what you ate"
+               value="${(e.item || '').replace(/"/g, '&quot;')}"
+               onchange="updateEntryText('${e.id}','item',this.value)">`
+          : '';
+        return `<div class="entry-row">
+          <span class="entry-time">${t}</span>
+          <input type="number" min="0" class="entry-input" value="${e.v || 0}"
+            onchange="updateEntry('${e.id}','v',this.value)">
+          ${itemInput}
+          <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
+        </div>`;
+      }).join('');
+    }
+
+    function updateEntry(id, field, val) {
+      const arr = getEntries(modalKey);
+      const e = arr.find(x => String(x.id) === String(id));
+      if (e) { e[field] = round(val); setEntries(modalKey, arr); render(); renderModalBody(); }
+    }
+
+    function updateEntryText(id, field, val) {
+      const arr = getEntries(modalKey);
+      const e = arr.find(x => String(x.id) === String(id));
+      if (e) { e[field] = val.trim(); setEntries(modalKey, arr); render(); }
+    }
+
+    function deleteEntry(id) {
+      const arr = getEntries(modalKey).filter(x => String(x.id) !== String(id));
+      setEntries(modalKey, arr);
+      render();
+      renderModalBody();
+    }
+
+    // Timer
+    function loadTimerState() {
+      if (!isToday()) return;
+      const state = getData();
+      periodsCompleted = state.timer_periods || 0;
+      totalWorkSeconds = state.timer_total_work || 0;
+      updateTimerStats();
+    }
+
+    function saveTimerState() {
+      const data = getData();
+      data.timer_periods = periodsCompleted;
+      data.timer_total_work = totalWorkSeconds;
+      saveData(data);
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+    }
+
+    function updateTimerDisplay() {
+      document.getElementById('timerDisplay').textContent = formatTime(timerSeconds);
+
+      const phaseEl = document.getElementById('timerPhase');
+      const progressEl = document.getElementById('progressFill');
+
+      let total, label, cls;
+      if (timerPhase === 'work') {
+        total = WORK_DURATION; label = 'Work Period'; cls = 'work';
+      } else if (timerPhase === 'short-break') {
+        total = SHORT_BREAK; label = 'Short Break (4 min)'; cls = 'short-break';
+      } else {
+        total = LONG_BREAK; label = 'Long Break (15 min)'; cls = 'long-break';
+      }
+
+      const paused = !timerRunning && timerStarted;
+      phaseEl.textContent = paused ? label + ' · ⏸ PAUSED' : label;
+      phaseEl.className = 'timer-phase ' + cls + (paused ? ' paused' : '');
+      progressEl.className = 'progress-fill ' + cls;
+
+      const elapsed = total - timerSeconds;
+      progressEl.style.width = (elapsed / total * 100) + '%';
+    }
+
+    function updateTimerStats() {
+      document.getElementById('workPeriods').textContent = periodsCompleted;
+      const totalMin = Math.floor(totalWorkSeconds / 60);
+      document.getElementById('totalWorkTime').textContent = totalMin + 'm';
+      const inCycle = periodsCompleted % PERIODS_BEFORE_LONG;
+      document.getElementById('cycleCount').textContent = inCycle + ' / ' + PERIODS_BEFORE_LONG;
+    }
+
+    function tick() {
+      if (timerPhase === 'work') totalWorkSeconds++;
+      timerSeconds--;
+      updateTimerDisplay();
+      if (timerSeconds <= 0) completePhase(true);
+      else if (timerSeconds % 30 === 0) saveTimerState();
+    }
+
+    function startTimer() {
+      if (!isToday() || timerRunning) return;
+      initAudio(); // unlock audio on the user's gesture
+      timerRunning = true;
+      timerStarted = true;
+      timerInterval = setInterval(tick, 1000);
+      updateTimerButtons();
+      updateTimerDisplay();
+    }
+
+    // Emergency break: freeze the countdown; work-time stops accruing. Resume picks up where it left off.
+    function pauseTimer() {
+      if (!timerRunning) return;
+      clearInterval(timerInterval);
+      timerRunning = false;
+      saveTimerState();
+      updateTimerButtons();
+      updateTimerDisplay();
+    }
+
+    function updateTimerButtons() {
+      const startBtn = document.getElementById('timerStartBtn');
+      const pauseBtn = document.getElementById('timerPauseBtn');
+      if (!startBtn || !pauseBtn) return;
+      if (timerRunning) {
+        startBtn.textContent = 'Start';
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+      } else {
+        startBtn.textContent = timerStarted ? 'Resume' : 'Start';
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+      }
+    }
+
+    function completePhase(auto) {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      timerStarted = false;
+
+      if (timerPhase === 'work') {
+        periodsCompleted++;
+        saveTimerState();
+        const inCycle = periodsCompleted % PERIODS_BEFORE_LONG;
+        if (inCycle === 0) {
+          timerPhase = 'long-break';
+          timerSeconds = LONG_BREAK;
+        } else {
+          timerPhase = 'short-break';
+          timerSeconds = SHORT_BREAK;
+        }
+      } else {
+        timerPhase = 'work';
+        timerSeconds = WORK_DURATION;
+      }
+
+      updateTimerButtons();
+      updateTimerDisplay();
+      updateTimerStats();
+      notifyPhaseComplete(auto);
+    }
+
+    function skipPhase() {
+      if (!isToday()) return;
+      clearInterval(timerInterval);
+      timerRunning = false;
+      completePhase(false);
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      timerStarted = false;
+      timerPhase = 'work';
+      timerSeconds = WORK_DURATION;
+      updateTimerButtons();
+      updateTimerDisplay();
+    }
+
+    function notifyPhaseComplete(auto) {
+      // timerPhase is already the NEW phase; 'work' means a break just ended.
+      const backToWork = timerPhase === 'work';
+      if (auto) playAlert(backToWork);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const msg = backToWork ? 'Break is over. Time to work!' : 'Work period complete. Take a break!';
+        new Notification('Health Tracker', { body: msg });
+      }
+    }
+
+    // ---- CSV export (one row per day, all metrics) ----
+    function csvEscape(v) {
+      v = (v === undefined || v === null) ? '' : String(v);
+      return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+
+    function exportCSV() {
+      const rows = Object.keys(localStorage)
+        .filter(k => /^ht_\d{4}-\d{2}-\d{2}$/.test(k))
+        .map(k => ({ date: k.slice(3), data: JSON.parse(localStorage.getItem(k) || '{}') }))
+        .sort((a, b) => a.date < b.date ? -1 : 1);
+
+      const cols = [
+        'date', 'pushups', 'pullups', 'dips', 'squats',
+        'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
+        'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
+        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'workout_notes'
+      ];
+
+      const lines = [cols.join(',')];
+      rows.forEach(r => {
+        const d = r.data;
+        const coffee = d.coffee;
+        const lastCoffee = (Array.isArray(coffee) && coffee.length && coffee[coffee.length - 1].t)
+          ? new Date(coffee[coffee.length - 1].t).toLocaleString() : '';
+        const protein = d.protein;
+        const proteinItems = Array.isArray(protein)
+          ? protein.filter(x => x.item).map(x => `${x.v}g ${x.item}`).join('; ') : '';
+        const vals = [
+          r.date,
+          sumVal(d.pushups), sumVal(d.pullups), sumVal(d.dips), sumVal(d.squats),
+          sumVal(d.bike, 'time'), sumVal(d.bike, 'dist'),
+          sumVal(d.run, 'time'), sumVal(d.run, 'dist'),
+          sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
+          sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
+          sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
+          d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
+          sumVal(d.meditation), sumVal(d.reading), d.workout_notes || ''
+        ];
+        lines.push(vals.map(csvEscape).join(','));
+      });
+
+      if (rows.length === 0) { alert('No data to export yet.'); return; }
+
+      const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'health-tracker-' + dateKey(new Date()) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // History
+    function toggleHistory() {
+      const container = document.getElementById('historyContainer');
+      if (container.style.display === 'none') {
+        container.style.display = 'block';
+        renderHistory();
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyContainer');
+      const days = [];
+      for (let i = 0; i < 30; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = 'ht_' + dateKey(d);
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          days.push({ date: formatDate(d), data: JSON.parse(raw) });
+        }
+      }
+
+      if (days.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">No history yet</p>';
+        return;
+      }
+
+      let html = `<table class="history-table"><thead><tr>
+        <th>Date</th><th>Push</th><th>Pull</th><th>Dips</th><th>Squat</th>
+        <th>Coffee</th><th>Protein</th><th>Work</th><th>Med</th><th>Read</th>
+      </tr></thead><tbody>`;
+
+      days.forEach(day => {
+        const d = day.data;
+        const workMin = Math.floor((d.timer_total_work || 0) / 60);
+        html += `<tr>
+          <td>${day.date}</td>
+          <td>${sumVal(d.pushups)}</td>
+          <td>${sumVal(d.pullups)}</td>
+          <td>${sumVal(d.dips)}</td>
+          <td>${sumVal(d.squats)}</td>
+          <td>${sumVal(d.coffee)}</td>
+          <td>${sumVal(d.protein)}g</td>
+          <td>${workMin}m</td>
+          <td>${sumVal(d.meditation)}m</td>
+          <td>${sumVal(d.reading)}m</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // Main render
+    function render() {
+      document.getElementById('dateDisplay').textContent = formatDate(currentDate);
+      renderExercises();
+      renderCardio();
+      renderIntake();
+      renderIF();
+      renderMind();
+      renderWorkout();
+      loadTimerState();
+      updateTimerDisplay();
+      updateTimerButtons();
+      updateSoundBtn();
+    }
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    render();
+
+    // Keep the fasting elapsed/progress ticking live
+    setInterval(updateIFLive, 1000);
+  </script>
+</body>
+</html>
