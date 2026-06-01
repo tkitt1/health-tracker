@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Daily Performance Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Performance">
   <style>
     :root {
       --bg: #0f1117;
@@ -2273,19 +2280,37 @@
       updateSoundBtn();
     }
 
-    // ---- Light / dark theme (per-device) ----
+    // ---- Light / dark theme: follow OS by default, manual override via toggle ----
+    function systemPrefersLight() {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    }
+    function effectiveTheme() {
+      const s = localStorage.getItem('ht_theme'); // 'light' | 'dark' = manual override
+      if (s === 'light' || s === 'dark') return s;
+      return systemPrefersLight() ? 'light' : 'dark'; // else follow the OS
+    }
     function updateThemeBtn() {
       const b = document.getElementById('themeToggle');
-      if (b) b.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+      if (b) {
+        const light = document.body.classList.contains('light');
+        b.textContent = light ? '☀️' : '🌙';
+        b.title = 'Theme: ' + (localStorage.getItem('ht_theme') ? (light ? 'light' : 'dark') + ' (manual)' : 'auto') + ' — tap to switch';
+      }
     }
     function applyTheme() {
-      if (localStorage.getItem('ht_theme') === 'light') document.body.classList.add('light');
+      document.body.classList.toggle('light', effectiveTheme() === 'light');
       updateThemeBtn();
     }
     function toggleTheme() {
-      const light = document.body.classList.toggle('light');
-      localStorage.setItem('ht_theme', light ? 'light' : 'dark');
-      updateThemeBtn();
+      const next = document.body.classList.contains('light') ? 'dark' : 'light';
+      localStorage.setItem('ht_theme', next); // manual override
+      applyTheme();
+    }
+    // Follow OS changes live, but only while there's no manual override
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () {
+        if (!localStorage.getItem('ht_theme')) applyTheme();
+      });
     }
 
     // Request notification permission
