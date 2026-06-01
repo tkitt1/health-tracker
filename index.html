@@ -760,6 +760,40 @@
       color: var(--text-muted);
     }
 
+    /* Auth bar */
+    .auth-bar {
+      margin-top: 10px;
+      min-height: 20px;
+      font-size: 0.78rem;
+    }
+    .auth-note { color: var(--text-muted); }
+    .auth-link {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 2px 4px;
+    }
+    .auth-link:hover { text-decoration: underline; }
+    .auth-help { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px; }
+    .auth-input {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .auth-input:focus { border-color: var(--accent); }
+    .auth-msg { font-size: 0.8rem; color: var(--orange); margin-bottom: 12px; min-height: 16px; }
+    .auth-actions { display: flex; gap: 8px; }
+
     /* History */
     .history-toggle {
       background: var(--surface);
@@ -823,6 +857,7 @@
         <span class="date-display" id="dateDisplay"></span>
         <button onclick="changeDate(1)">&#8250;</button>
       </div>
+      <div class="auth-bar" id="authBar"></div>
     </header>
 
     <!-- Exercise Counters -->
@@ -927,6 +962,29 @@
     </div>
   </div>
 
+  <!-- Auth / cloud sync modal -->
+  <div class="modal-overlay" id="authOverlay" style="display:none" onclick="if(event.target===this)closeAuth()">
+    <div class="modal">
+      <div class="modal-header">
+        <span>☁ Cloud Sync</span>
+        <button class="modal-close" onclick="closeAuth()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="auth-help">Sign in to sync your data across devices. Use the same account on your phone and laptop.</p>
+        <input type="email" id="authEmail" class="auth-input" placeholder="email" autocomplete="username">
+        <input type="password" id="authPassword" class="auth-input" placeholder="password" autocomplete="current-password">
+        <div class="auth-msg" id="authMsg"></div>
+        <div class="auth-actions">
+          <button class="if-btn if-start-btn" onclick="doSignIn()">Sign In</button>
+          <button class="if-btn if-reset-btn" onclick="doSignUp()">Create Account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase client (cloud sync). App still works fully if this fails to load. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
     const EXERCISES = [
       { key: 'pushups', label: 'Pushups', icon: '💪' },
@@ -972,6 +1030,127 @@
     const SHORT_BREAK = 4 * 60;
     const LONG_BREAK = 15 * 60;
     const PERIODS_BEFORE_LONG = 4;
+
+    // ===== Cloud sync (Supabase) — paste your project values below =====
+    const SUPABASE_URL = '';      // e.g. https://abcdxyz.supabase.co
+    const SUPABASE_ANON_KEY = ''; // the "anon public" API key (safe to embed)
+
+    let sb = null;
+    let currentUser = null;
+
+    function syncConfigured() {
+      return !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+    }
+
+    function metaGet() { try { return JSON.parse(localStorage.getItem('ht_meta') || '{}'); } catch (e) { return {}; } }
+    function metaSet(m) { localStorage.setItem('ht_meta', JSON.stringify(m)); }
+
+    // Central write: mirror every key to localStorage AND the cloud.
+    function persist(key, value) {
+      localStorage.setItem(key, value);
+      const m = metaGet(); m[key] = Date.now(); metaSet(m);
+      pushKey(key, value, m[key]);
+    }
+
+    async function pushKey(key, value, ts) {
+      if (!sb || !currentUser) return;
+      try {
+        await sb.from('tracker_data').upsert(
+          { user_id: currentUser.id, key, value, updated_at: new Date(ts || Date.now()).toISOString() },
+          { onConflict: 'user_id,key' }
+        );
+      } catch (e) { /* offline — resynced on next focus/login */ }
+    }
+
+    // Two-way merge: newest write per key wins (by timestamp).
+    async function syncOnLogin() {
+      if (!sb || !currentUser) return;
+      let data;
+      try {
+        const res = await sb.from('tracker_data').select('key,value,updated_at').eq('user_id', currentUser.id);
+        if (res.error) throw res.error;
+        data = res.data || [];
+      } catch (e) { console.warn('sync pull failed', e); return; }
+
+      const remote = {};
+      data.forEach(r => remote[r.key] = { value: r.value, ts: new Date(r.updated_at).getTime() });
+      const m = metaGet();
+      const localKeys = Object.keys(localStorage).filter(k => k.startsWith('ht_') && k !== 'ht_meta');
+      const allKeys = new Set([...Object.keys(remote), ...localKeys]);
+      const toPush = [];
+      allKeys.forEach(k => {
+        const r = remote[k];
+        const lv = localStorage.getItem(k);
+        const lts = m[k] || 0;
+        if (r && (lv == null || r.ts >= lts)) {
+          localStorage.setItem(k, r.value);   // remote is newer
+          m[k] = r.ts;
+        } else if (lv != null && (!r || lts > r.ts)) {
+          const ts = lts || Date.now(); m[k] = ts;   // local is newer / cloud missing
+          toPush.push({ user_id: currentUser.id, key: k, value: lv, updated_at: new Date(ts).toISOString() });
+        }
+      });
+      metaSet(m);
+      if (toPush.length) { try { await sb.from('tracker_data').upsert(toPush, { onConflict: 'user_id,key' }); } catch (e) {} }
+      render();
+    }
+
+    async function initSync() {
+      updateAuthBar();
+      if (!syncConfigured()) return;
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      try {
+        const { data } = await sb.auth.getSession();
+        currentUser = data.session ? data.session.user : null;
+      } catch (e) { currentUser = null; }
+      updateAuthBar();
+      if (currentUser) await syncOnLogin();
+      sb.auth.onAuthStateChange((_e, session) => {
+        currentUser = session ? session.user : null;
+        updateAuthBar();
+        if (currentUser) syncOnLogin();
+      });
+      // Pull latest when returning to the tab (cheap cross-device refresh)
+      window.addEventListener('focus', () => { if (currentUser) syncOnLogin(); });
+    }
+
+    // ---- Auth UI ----
+    function updateAuthBar() {
+      const el = document.getElementById('authBar');
+      if (!el) return;
+      if (!syncConfigured()) { el.innerHTML = '<span class="auth-note">Cloud sync not set up</span>'; return; }
+      if (currentUser) {
+        el.innerHTML = `<span class="auth-note">☁ Synced · ${currentUser.email}</span>
+          <button class="auth-link" onclick="doSignOut()">Sign out</button>`;
+      } else {
+        el.innerHTML = `<button class="auth-link" onclick="openAuth()">☁ Sign in to sync</button>`;
+      }
+    }
+
+    function openAuth() { document.getElementById('authMsg').textContent = ''; document.getElementById('authOverlay').style.display = 'flex'; }
+    function closeAuth() { document.getElementById('authOverlay').style.display = 'none'; }
+
+    async function doSignIn() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const msg = document.getElementById('authMsg');
+      msg.textContent = 'Signing in…';
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { msg.textContent = error.message; return; }
+      closeAuth();
+    }
+
+    async function doSignUp() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const msg = document.getElementById('authMsg');
+      msg.textContent = 'Creating account…';
+      const { error } = await sb.auth.signUp({ email, password });
+      if (error) { msg.textContent = error.message; return; }
+      msg.textContent = 'Account created. If email confirmation is on, check your inbox, then sign in.';
+    }
+
+    async function doSignOut() { try { await sb.auth.signOut(); } catch (e) {} currentUser = null; updateAuthBar(); }
 
     let currentDate = new Date();
     let timerInterval = null;
@@ -1027,7 +1206,7 @@
 
     function toggleSound() {
       soundEnabled = !soundEnabled;
-      localStorage.setItem('ht_sound', soundEnabled ? 'on' : 'off');
+      persist('ht_sound', soundEnabled ? 'on' : 'off');
       updateSoundBtn();
       if (soundEnabled) { initAudio(); playAlert(true); } // confirm + unlock audio
     }
@@ -1062,7 +1241,7 @@
     }
 
     function saveData(data) {
-      localStorage.setItem('ht_' + dateKey(), JSON.stringify(data));
+      persist('ht_' + dateKey(), JSON.stringify(data));
     }
 
     function getField(field, fallback) {
@@ -1239,7 +1418,7 @@
     function getIF() {
       try { return JSON.parse(localStorage.getItem('ht_if') || '{}'); } catch (e) { return {}; }
     }
-    function saveIF(o) { localStorage.setItem('ht_if', JSON.stringify(o)); }
+    function saveIF(o) { persist('ht_if', JSON.stringify(o)); }
 
     function fmtDur(ms, withSec) {
       if (ms < 0) ms = 0;
@@ -1747,6 +1926,9 @@
 
     // Keep the fasting elapsed/progress ticking live
     setInterval(updateIFLive, 1000);
+
+    // Initialise cloud sync (no-op until SUPABASE_URL/KEY are filled in)
+    initSync();
   </script>
 </body>
 </html>
