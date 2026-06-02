@@ -1986,9 +1986,10 @@
       const distUnit = (metaFor(modalKey).distUnit) || 'km';
       const distStep = (metaFor(modalKey).distStep) || '0.1';
       const withItem = metaFor(modalKey).withItem;
-      const isExercise = EXERCISES.some(m => m.key === modalKey);
+      const hasVar = supportsVariation(modalKey);
       body.innerHTML = arr.map(e => {
         const t = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+        const varInput = hasVar ? buildVariationSelect(e) : '';
         if (modalType === 'cardio') {
           return `<div class="entry-row">
             <span class="entry-time">${t}</span>
@@ -1996,6 +1997,7 @@
               onchange="updateEntry('${e.id}','time',this.value)"><span class="entry-u">min</span>
             <input type="number" min="0" step="${distStep}" class="entry-input" value="${e.dist || 0}"
               onchange="updateEntry('${e.id}','dist',this.value)"><span class="entry-u">${distUnit}</span>
+            ${varInput}
             <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
           </div>`;
         }
@@ -2004,7 +2006,6 @@
                value="${(e.item || '').replace(/"/g, '&quot;')}"
                onchange="updateEntryText('${e.id}','item',this.value)">`
           : '';
-        const varInput = isExercise ? buildVariationSelect(e) : '';
         return `<div class="entry-row">
           <span class="entry-time">${t}</span>
           <input type="number" min="0" class="entry-input" value="${e.v || 0}"
@@ -2013,7 +2014,7 @@
           <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
         </div>`;
       }).join('');
-      if (isExercise) {
+      if (hasVar) {
         body.innerHTML += `<div class="var-manage"><span class="view-link" style="margin-left:0" onclick="openVarManager()">⚙ Manage variations</span></div>`;
       }
     }
@@ -2060,7 +2061,13 @@
       squats: ['Standard', 'Sumo', 'Jump', 'Bulgarian', 'Pistol'],
       pullups: ['Standard', 'Wide grip', 'Chin-up', 'Commando', 'Weighted'],
       dips: ['Standard', 'Bench', 'Weighted', 'Ring', 'Forward lean'],
+      run: ['Standard', 'Easy', 'Tempo', 'Intervals', 'Trail'],
+      walk: ['Standard', 'Casual', 'Brisk', 'Incline', 'Treadmill'],
+      swim: ['Standard', 'Freestyle', 'Breaststroke', 'Backstroke', 'Kickboard'],
+      reading: ['Standard', 'Book', 'Article', 'Audiobook', 'Scripture'],
+      meditation: ['Standard', 'Guided', 'Unguided', 'Breathwork', 'Body scan'],
     };
+    function supportsVariation(key) { return Object.prototype.hasOwnProperty.call(DEFAULT_VARIATIONS, key); }
     function getVarMap() {
       try { const v = JSON.parse(localStorage.getItem('ht_variations') || 'null'); if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch (e) {}
       return {};
@@ -2347,12 +2354,13 @@
       return out;
     }
 
+    function varSuffix(e) { return (e.variation && e.variation !== 'Standard') ? ' · ' + e.variation : ''; }
     function reportDetailGroups() {
       return [
-        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} reps` + (e.variation && e.variation !== 'Standard' ? ' · ' + e.variation : '') })),
-        ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` })),
+        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} reps` + varSuffix(e) })),
+        ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` + varSuffix(e) })),
         ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
-        ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` })),
+        ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` + varSuffix(e) })),
       ];
     }
 
@@ -2584,36 +2592,41 @@
       updateSoundBtn();
     }
 
-    // ---- Light / dark theme: follow OS by default, manual override via toggle ----
+    // ---- Theme: 3-way toggle — Auto (follow OS) → Light → Dark ----
+    function themeMode() {
+      const m = localStorage.getItem('ht_theme');
+      return (m === 'light' || m === 'dark' || m === 'auto') ? m : 'auto'; // default = auto
+    }
     function systemPrefersLight() {
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
     }
     function effectiveTheme() {
-      const s = localStorage.getItem('ht_theme'); // 'light' | 'dark' = manual override
-      if (s === 'light' || s === 'dark') return s;
-      return systemPrefersLight() ? 'light' : 'dark'; // else follow the OS
+      const m = themeMode();
+      if (m === 'light' || m === 'dark') return m;
+      return systemPrefersLight() ? 'light' : 'dark'; // auto -> follow OS
     }
     function updateThemeBtn() {
       const b = document.getElementById('themeToggle');
-      if (b) {
-        const light = document.body.classList.contains('light');
-        b.textContent = light ? '☀️' : '🌙';
-        b.title = 'Theme: ' + (localStorage.getItem('ht_theme') ? (light ? 'light' : 'dark') + ' (manual)' : 'auto') + ' — tap to switch';
-      }
+      if (!b) return;
+      const m = themeMode();
+      b.textContent = m === 'auto' ? '🌓' : (m === 'light' ? '☀️' : '🌙');
+      b.title = m === 'auto' ? 'Theme: Auto (follows your device) — tap for Light'
+        : m === 'light' ? 'Theme: Light — tap for Dark'
+          : 'Theme: Dark — tap for Auto';
     }
     function applyTheme() {
       document.body.classList.toggle('light', effectiveTheme() === 'light');
       updateThemeBtn();
     }
     function toggleTheme() {
-      const next = document.body.classList.contains('light') ? 'dark' : 'light';
-      localStorage.setItem('ht_theme', next); // manual override
+      const next = { auto: 'light', light: 'dark', dark: 'auto' }[themeMode()];
+      localStorage.setItem('ht_theme', next);
       applyTheme();
     }
-    // Follow OS changes live, but only while there's no manual override
+    // While in Auto, follow live OS appearance changes
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () {
-        if (!localStorage.getItem('ht_theme')) applyTheme();
+        if (themeMode() === 'auto') applyTheme();
       });
     }
 
