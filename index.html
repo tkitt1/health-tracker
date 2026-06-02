@@ -1368,13 +1368,6 @@
     async function doSignOut() { try { await sb.auth.signOut(); } catch (e) {} currentUser = null; updateAuthBar(); }
 
     let currentDate = new Date();
-    let timerInterval = null;
-    let timerSeconds = WORK_DURATION;
-    let timerRunning = false;
-    let timerStarted = false; // a period is in progress (started, not yet completed/reset)
-    let timerPhase = 'work';
-    let periodsCompleted = 0;
-    let totalWorkSeconds = 0;
 
     // ---- Audio alerts for the work timer ----
     let audioCtx = null;
@@ -2016,153 +2009,136 @@
     }
 
     // Timer
-    function loadTimerState() {
-      if (!isToday()) return;
-      const state = getData();
-      periodsCompleted = state.timer_periods || 0;
-      totalWorkSeconds = state.timer_total_work || 0;
-      updateTimerStats();
-    }
-
-    function saveTimerState() {
-      const data = getData();
-      data.timer_periods = periodsCompleted;
-      data.timer_total_work = totalWorkSeconds;
-      saveData(data);
-    }
-
     function formatTime(s) {
       const m = Math.floor(s / 60);
       const sec = s % 60;
       return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
     }
 
-    function updateTimerDisplay() {
-      document.getElementById('timerDisplay').textContent = formatTime(timerSeconds);
+    // ---- Work timer: timestamp-based + synced (like the IF clock) ----
+    function phaseDur(p) { return p === 'work' ? WORK_DURATION : p === 'short-break' ? SHORT_BREAK : LONG_BREAK; }
 
+    function getTimer() {
+      try { const t = JSON.parse(localStorage.getItem('ht_timer') || 'null'); if (t && typeof t === 'object') return t; } catch (e) {}
+      return { phase: 'work', running: false, endsAt: 0, remaining: WORK_DURATION, started: false, periods: 0, workSeconds: 0, day: dateKey(new Date()) };
+    }
+    function saveTimer(t) {
+      persist('ht_timer', JSON.stringify(t));
+      mirrorDailyStats(t); // keep per-day totals for Report/History/CSV
+    }
+    function mirrorDailyStats(t) {
+      const key = 'ht_' + (t.day || dateKey(new Date()));
+      let d = {}; try { d = JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) {}
+      d.timer_periods = t.periods || 0;
+      d.timer_total_work = t.workSeconds || 0;
+      persist(key, JSON.stringify(d));
+    }
+    function timerRemainingSec(t) {
+      if (t.running) return Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
+      return Math.max(0, t.remaining || 0);
+    }
+    function advanceTimer(t) { // current phase ended naturally -> move to next
+      if (t.phase === 'work') {
+        t.periods = (t.periods || 0) + 1;
+        t.workSeconds = (t.workSeconds || 0) + WORK_DURATION;
+        t.phase = (t.periods % PERIODS_BEFORE_LONG === 0) ? 'long-break' : 'short-break';
+      } else {
+        t.phase = 'work';
+      }
+      t.endsAt = t.endsAt + phaseDur(t.phase) * 1000; // next phase began when the last ended
+    }
+
+    // Single source of truth, recomputed every second; also reconciles across sessions.
+    function updateTimerLive(silent) {
+      let t = getTimer();
+      let changed = false;
+      const today = dateKey(new Date());
+      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; changed = true; }
+      if (t.running) {
+        let transitioned = false, guard = 0;
+        while (t.running && Date.now() >= t.endsAt && guard < 5000) { advanceTimer(t); transitioned = true; guard++; }
+        if (transitioned) { changed = true; if (!silent) announcePhase(t.phase); }
+      }
+      if (changed) saveTimer(t);
+      refreshTimerUI(t);
+    }
+
+    function refreshTimerUI(t) {
+      t = t || getTimer();
+      const remaining = timerRemainingSec(t);
+      const total = phaseDur(t.phase);
+      let label, cls;
+      if (t.phase === 'work') { label = 'Work Period'; cls = 'work'; }
+      else if (t.phase === 'short-break') { label = 'Short Break (4 min)'; cls = 'short-break'; }
+      else { label = 'Long Break (15 min)'; cls = 'long-break'; }
+
+      const dEl = document.getElementById('timerDisplay'); if (dEl) dEl.textContent = formatTime(remaining);
       const phaseEl = document.getElementById('timerPhase');
       const progressEl = document.getElementById('progressFill');
-
-      let total, label, cls;
-      if (timerPhase === 'work') {
-        total = WORK_DURATION; label = 'Work Period'; cls = 'work';
-      } else if (timerPhase === 'short-break') {
-        total = SHORT_BREAK; label = 'Short Break (4 min)'; cls = 'short-break';
-      } else {
-        total = LONG_BREAK; label = 'Long Break (15 min)'; cls = 'long-break';
+      const paused = !t.running && t.started;
+      if (phaseEl) {
+        phaseEl.textContent = paused ? label + ' · ⏸ PAUSED' : label;
+        phaseEl.className = 'timer-phase ' + cls + (paused ? ' paused' : '');
       }
+      if (progressEl) {
+        progressEl.className = 'progress-fill ' + cls;
+        progressEl.style.width = ((total - remaining) / total * 100) + '%';
+      }
+      const wpEl = document.getElementById('workPeriods'); if (wpEl) wpEl.textContent = t.periods || 0;
+      const liveWork = (t.workSeconds || 0) + (t.phase === 'work' ? (total - remaining) : 0);
+      const twEl = document.getElementById('totalWorkTime'); if (twEl) twEl.textContent = Math.floor(liveWork / 60) + 'm';
+      const ccEl = document.getElementById('cycleCount'); if (ccEl) ccEl.textContent = ((t.periods || 0) % PERIODS_BEFORE_LONG) + ' / ' + PERIODS_BEFORE_LONG;
 
-      const paused = !timerRunning && timerStarted;
-      phaseEl.textContent = paused ? label + ' · ⏸ PAUSED' : label;
-      phaseEl.className = 'timer-phase ' + cls + (paused ? ' paused' : '');
-      progressEl.className = 'progress-fill ' + cls;
-
-      const elapsed = total - timerSeconds;
-      progressEl.style.width = (elapsed / total * 100) + '%';
-    }
-
-    function updateTimerStats() {
-      document.getElementById('workPeriods').textContent = periodsCompleted;
-      const totalMin = Math.floor(totalWorkSeconds / 60);
-      document.getElementById('totalWorkTime').textContent = totalMin + 'm';
-      const inCycle = periodsCompleted % PERIODS_BEFORE_LONG;
-      document.getElementById('cycleCount').textContent = inCycle + ' / ' + PERIODS_BEFORE_LONG;
-    }
-
-    function tick() {
-      if (timerPhase === 'work') totalWorkSeconds++;
-      timerSeconds--;
-      updateTimerDisplay();
-      if (timerSeconds <= 0) completePhase(true);
-      else if (timerSeconds % 30 === 0) saveTimerState();
+      const startBtn = document.getElementById('timerStartBtn');
+      const pauseBtn = document.getElementById('timerPauseBtn');
+      if (startBtn && pauseBtn) {
+        if (t.running) { startBtn.textContent = 'Start'; startBtn.disabled = true; pauseBtn.disabled = false; }
+        else { startBtn.textContent = t.started ? 'Resume' : 'Start'; startBtn.disabled = false; pauseBtn.disabled = true; }
+      }
     }
 
     function startTimer() {
-      if (!isToday() || timerRunning) return;
+      const t = getTimer();
+      if (t.running) return;
       initAudio(); // unlock audio on the user's gesture
-      timerRunning = true;
-      timerStarted = true;
-      timerInterval = setInterval(tick, 1000);
-      updateTimerButtons();
-      updateTimerDisplay();
+      const rem = (t.started && t.remaining != null) ? t.remaining : phaseDur(t.phase);
+      t.running = true; t.started = true; t.endsAt = Date.now() + rem * 1000;
+      if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; }
+      saveTimer(t); refreshTimerUI(t);
     }
 
-    // Emergency break: freeze the countdown; work-time stops accruing. Resume picks up where it left off.
+    // Emergency break: freeze the countdown. Resume picks up where it left off.
     function pauseTimer() {
-      if (!timerRunning) return;
-      clearInterval(timerInterval);
-      timerRunning = false;
-      saveTimerState();
-      updateTimerButtons();
-      updateTimerDisplay();
-    }
-
-    function updateTimerButtons() {
-      const startBtn = document.getElementById('timerStartBtn');
-      const pauseBtn = document.getElementById('timerPauseBtn');
-      if (!startBtn || !pauseBtn) return;
-      if (timerRunning) {
-        startBtn.textContent = 'Start';
-        startBtn.disabled = true;
-        pauseBtn.disabled = false;
-      } else {
-        startBtn.textContent = timerStarted ? 'Resume' : 'Start';
-        startBtn.disabled = false;
-        pauseBtn.disabled = true;
-      }
-    }
-
-    function completePhase(auto) {
-      clearInterval(timerInterval);
-      timerRunning = false;
-      timerStarted = false;
-
-      if (timerPhase === 'work') {
-        periodsCompleted++;
-        saveTimerState();
-        const inCycle = periodsCompleted % PERIODS_BEFORE_LONG;
-        if (inCycle === 0) {
-          timerPhase = 'long-break';
-          timerSeconds = LONG_BREAK;
-        } else {
-          timerPhase = 'short-break';
-          timerSeconds = SHORT_BREAK;
-        }
-      } else {
-        timerPhase = 'work';
-        timerSeconds = WORK_DURATION;
-      }
-
-      updateTimerButtons();
-      updateTimerDisplay();
-      updateTimerStats();
-      notifyPhaseComplete(auto);
+      const t = getTimer();
+      if (!t.running) return;
+      t.remaining = Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
+      t.running = false;
+      saveTimer(t); refreshTimerUI(t);
     }
 
     function skipPhase() {
-      if (!isToday()) return;
-      clearInterval(timerInterval);
-      timerRunning = false;
-      completePhase(false);
+      const t = getTimer();
+      if (t.phase === 'work') { // count the period, but not a full work-time block (it wasn't completed)
+        t.periods = (t.periods || 0) + 1;
+        t.phase = (t.periods % PERIODS_BEFORE_LONG === 0) ? 'long-break' : 'short-break';
+      } else {
+        t.phase = 'work';
+      }
+      t.running = false; t.started = false; t.remaining = phaseDur(t.phase); t.endsAt = 0;
+      saveTimer(t); refreshTimerUI(t);
     }
 
     function resetTimer() {
-      clearInterval(timerInterval);
-      timerRunning = false;
-      timerStarted = false;
-      timerPhase = 'work';
-      timerSeconds = WORK_DURATION;
-      updateTimerButtons();
-      updateTimerDisplay();
+      const t = getTimer();
+      t.phase = 'work'; t.running = false; t.started = false; t.remaining = WORK_DURATION; t.endsAt = 0;
+      saveTimer(t); refreshTimerUI(t);
     }
 
-    function notifyPhaseComplete(auto) {
-      // timerPhase is already the NEW phase; 'work' means a break just ended.
-      const backToWork = timerPhase === 'work';
-      if (auto) playAlert(backToWork);
+    function announcePhase(newPhase) {
+      const backToWork = newPhase === 'work';
+      playAlert(backToWork); // playAlert already respects the mute setting
       if ('Notification' in window && Notification.permission === 'granted') {
-        const msg = backToWork ? 'Break is over. Time to work!' : 'Work period complete. Take a break!';
-        new Notification('Health Tracker', { body: msg });
+        new Notification('Health Tracker', { body: backToWork ? 'Break is over. Time to work!' : 'Work period complete. Take a break!' });
       }
     }
 
@@ -2482,9 +2458,7 @@
       renderIF();
       renderMind();
       renderWorkout();
-      loadTimerState();
-      updateTimerDisplay();
-      updateTimerButtons();
+      refreshTimerUI();
       updateSoundBtn();
     }
 
@@ -2528,9 +2502,11 @@
 
     applyTheme();
     render();
+    updateTimerLive(true); // reconcile work-timer state on load (no sound for missed transitions)
 
-    // Keep the fasting elapsed/progress ticking live
+    // Keep the fasting + work timers ticking live
     setInterval(updateIFLive, 1000);
+    setInterval(updateTimerLive, 1000);
 
     // Initialise cloud sync (no-op until SUPABASE_URL/KEY are filled in)
     initSync();
