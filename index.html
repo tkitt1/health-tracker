@@ -341,17 +341,19 @@
     .var-manage { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); text-align: center; }
     .entry-row input.entry-input { width: 76px; flex: 0 0 76px; }
     .entry-row input.entry-item-input,
-    .entry-row input.entry-var-input {
+    .entry-row select.entry-var-select {
       flex: 1;
       width: auto;
-      min-width: 90px;
+      min-width: 100px;
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: 6px;
       padding: 5px 8px;
       font-size: 0.85rem;
+      color-scheme: dark;
     }
+    body.light .entry-row select.entry-var-select { color-scheme: light; }
 
     /* Workout ideas */
     .workout-card {
@@ -1898,11 +1900,7 @@
                value="${(e.item || '').replace(/"/g, '&quot;')}"
                onchange="updateEntryText('${e.id}','item',this.value)">`
           : '';
-        const varInput = isExercise
-          ? `<input type="text" class="entry-var-input" list="exVariations" placeholder="Standard"
-               value="${(e.variation || 'Standard').replace(/"/g, '&quot;')}"
-               onchange="updateEntryText('${e.id}','variation',this.value)">`
-          : '';
+        const varInput = isExercise ? buildVariationSelect(e) : '';
         return `<div class="entry-row">
           <span class="entry-time">${t}</span>
           <input type="number" min="0" class="entry-input" value="${e.v || 0}"
@@ -1926,6 +1924,30 @@
       const arr = getEntries(modalKey);
       const e = arr.find(x => String(x.id) === String(id));
       if (e) { e[field] = val.trim(); setEntries(modalKey, arr); render(); }
+    }
+
+    // Per-entry variation picker: real <select> + "Custom…" for free entry
+    function buildVariationSelect(e) {
+      const cur = e.variation || 'Standard';
+      const opts = getVariations().slice();
+      if (!opts.some(x => x === cur)) opts.unshift(cur); // ensure current value is selectable
+      return `<select class="entry-var-select" onchange="changeVariation('${e.id}', this.value)">`
+        + opts.map(v => `<option value="${v.replace(/"/g, '&quot;')}"${v === cur ? ' selected' : ''}>${v.replace(/</g, '&lt;')}</option>`).join('')
+        + `<option value="__custom__">➕ Custom…</option></select>`;
+    }
+
+    function changeVariation(id, val) {
+      if (val === '__custom__') {
+        const custom = (prompt('Enter a custom variation:') || '').trim();
+        if (custom) {
+          const list = getVariations();
+          if (!list.some(x => x.toLowerCase() === custom.toLowerCase())) { list.push(custom); saveVariations(list); }
+          updateEntryText(id, 'variation', custom);
+        }
+        renderModalBody(); // reflect new value / revert the select if cancelled
+        return;
+      }
+      updateEntryText(id, 'variation', val);
     }
 
     // ---- Manage exercise variations (synced list) ----
