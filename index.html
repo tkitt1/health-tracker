@@ -338,6 +338,7 @@
 
     /* Editable text fields in the edit modal (protein item, exercise variation) */
     .entry-row { flex-wrap: wrap; }
+    .var-manage { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); text-align: center; }
     .entry-row input.entry-input { width: 76px; flex: 0 0 76px; }
     .entry-row input.entry-item-input,
     .entry-row input.entry-var-input {
@@ -1162,6 +1163,17 @@
     </div>
   </div>
 
+  <!-- Variation manager modal -->
+  <div class="modal-overlay" id="varOverlay" style="display:none" onclick="if(event.target===this)closeVarManager()">
+    <div class="modal">
+      <div class="modal-header">
+        <span>🏷️ Exercise Variations</span>
+        <button class="modal-close" onclick="closeVarManager()">&times;</button>
+      </div>
+      <div class="modal-body" id="varBody"></div>
+    </div>
+  </div>
+
   <!-- Supabase client (cloud sync). App still works fully if this fails to load. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1899,6 +1911,9 @@
           <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
         </div>`;
       }).join('');
+      if (isExercise) {
+        body.innerHTML += `<div class="var-manage"><span class="view-link" style="margin-left:0" onclick="openVarManager()">⚙ Manage variations</span></div>`;
+      }
     }
 
     function updateEntry(id, field, val) {
@@ -1911,6 +1926,58 @@
       const arr = getEntries(modalKey);
       const e = arr.find(x => String(x.id) === String(id));
       if (e) { e[field] = val.trim(); setEntries(modalKey, arr); render(); }
+    }
+
+    // ---- Manage exercise variations (synced list) ----
+    const DEFAULT_VARIATIONS = ['Standard', 'Weighted', 'Assisted', 'Wide', 'Close / Diamond', 'Incline', 'Decline', 'Negative / Slow', 'To failure'];
+    function getVariations() {
+      try { const v = JSON.parse(localStorage.getItem('ht_variations') || 'null'); if (Array.isArray(v) && v.length) return v; } catch (e) {}
+      return DEFAULT_VARIATIONS.slice();
+    }
+    function saveVariations(arr) { persist('ht_variations', JSON.stringify(arr)); renderVariationDatalist(); }
+    function renderVariationDatalist() {
+      const dl = document.getElementById('exVariations');
+      if (dl) dl.innerHTML = getVariations().map(v => `<option value="${v.replace(/"/g, '&quot;')}"></option>`).join('');
+    }
+
+    function openVarManager() { renderVarManager(); document.getElementById('varOverlay').style.display = 'flex'; }
+    function closeVarManager() {
+      document.getElementById('varOverlay').style.display = 'none';
+      if (modalKey) renderModalBody(); // refresh open entries so the dropdown reflects changes
+    }
+    function renderVarManager() {
+      const list = getVariations();
+      let html = '<p class="auth-help">Add, rename, or remove the options in the variation dropdown. Existing entries keep whatever they were set to.</p>';
+      html += list.map((v, i) =>
+        `<div class="entry-row">
+          <input type="text" class="entry-item-input" value="${v.replace(/"/g, '&quot;')}" onchange="renameVariation(${i}, this.value)">
+          <button class="entry-del" onclick="deleteVariation(${i})">×</button>
+        </div>`
+      ).join('');
+      html += `<div class="add-row" style="margin-top:14px">
+          <input type="text" id="newVarInput" placeholder="New variation" onkeydown="if(event.key==='Enter')addVariation()">
+          <button class="add-btn" onclick="addVariation()">Add</button>
+        </div>`;
+      document.getElementById('varBody').innerHTML = html;
+    }
+    function addVariation() {
+      const el = document.getElementById('newVarInput');
+      const v = el.value.trim();
+      if (!v) return;
+      const list = getVariations();
+      if (!list.some(x => x.toLowerCase() === v.toLowerCase())) list.push(v);
+      saveVariations(list); renderVarManager();
+    }
+    function renameVariation(i, val) {
+      const v = val.trim();
+      const list = getVariations();
+      if (!v) { renderVarManager(); return; } // empty -> revert
+      list[i] = v; saveVariations(list);
+    }
+    function deleteVariation(i) {
+      const list = getVariations();
+      list.splice(i, 1);
+      saveVariations(list); renderVarManager();
     }
 
     function deleteEntry(id) {
@@ -2391,6 +2458,7 @@
       updateTimerDisplay();
       updateTimerButtons();
       updateSoundBtn();
+      renderVariationDatalist();
     }
 
     // ---- Light / dark theme: follow OS by default, manual override via toggle ----
