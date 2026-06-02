@@ -1966,7 +1966,7 @@
       modalKey = key; modalType = type;
       const meta = metaFor(key);
       document.getElementById('modalTitle').textContent =
-        (meta.icon ? meta.icon + ' ' : '') + meta.label + ' — entries';
+        (meta.icon ? meta.icon + ' ' : '') + meta.label;
       renderModalBody();
       document.getElementById('modalOverlay').style.display = 'flex';
     }
