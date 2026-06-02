@@ -786,7 +786,7 @@
       border: 1px solid var(--accent);
       color: var(--accent);
     }
-    .if-elapsed.reached { font-size: 1.4rem; color: var(--green); }
+    .if-elapsed.reached { color: var(--green); }
     .if-reset-btn {
       background: var(--surface-hover);
       color: var(--text);
@@ -1897,10 +1897,11 @@
         if (label) label.textContent = `remaining until ${goalH}h goal`;
         if (rem) rem.textContent = `${fmtDur(elapsed)} elapsed`;
       } else {
-        elapsedEl.textContent = '🎉 Goal reached';
+        // Goal reached — keep the clock RUNNING, counting up total fast time until ended.
+        elapsedEl.textContent = fmtDur(elapsed, true);
         elapsedEl.classList.add('reached');
-        if (label) label.textContent = `${goalH}h goal complete`;
-        if (rem) rem.textContent = `${fmtDur(-remaining)} past goal · ${fmtDur(elapsed)} total`;
+        if (label) label.textContent = `🎉 ${goalH}h goal reached — still fasting`;
+        if (rem) rem.textContent = `${fmtDur(-remaining)} past goal`;
       }
       if (fill) {
         fill.style.width = Math.min(100, elapsed / goalMs * 100) + '%';
