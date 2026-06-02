@@ -336,11 +336,14 @@
       padding-left: 28px;
     }
 
-    /* Protein item text in the edit modal */
-    .entry-row input.entry-item-input {
+    /* Editable text fields in the edit modal (protein item, exercise variation) */
+    .entry-row { flex-wrap: wrap; }
+    .entry-row input.entry-input { width: 76px; flex: 0 0 76px; }
+    .entry-row input.entry-item-input,
+    .entry-row input.entry-var-input {
       flex: 1;
       width: auto;
-      min-width: 60px;
+      min-width: 90px;
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
@@ -1088,6 +1091,17 @@
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
+      <datalist id="exVariations">
+        <option value="Standard"></option>
+        <option value="Weighted"></option>
+        <option value="Assisted"></option>
+        <option value="Wide"></option>
+        <option value="Close / Diamond"></option>
+        <option value="Incline"></option>
+        <option value="Decline"></option>
+        <option value="Negative / Slow"></option>
+        <option value="To failure"></option>
+      </datalist>
     </div>
   </div>
 
@@ -1854,6 +1868,7 @@
       const distUnit = (metaFor(modalKey).distUnit) || 'km';
       const distStep = (metaFor(modalKey).distStep) || '0.1';
       const withItem = metaFor(modalKey).withItem;
+      const isExercise = EXERCISES.some(m => m.key === modalKey);
       body.innerHTML = arr.map(e => {
         const t = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
         if (modalType === 'cardio') {
@@ -1871,11 +1886,16 @@
                value="${(e.item || '').replace(/"/g, '&quot;')}"
                onchange="updateEntryText('${e.id}','item',this.value)">`
           : '';
+        const varInput = isExercise
+          ? `<input type="text" class="entry-var-input" list="exVariations" placeholder="Standard"
+               value="${(e.variation || 'Standard').replace(/"/g, '&quot;')}"
+               onchange="updateEntryText('${e.id}','variation',this.value)">`
+          : '';
         return `<div class="entry-row">
           <span class="entry-time">${t}</span>
           <input type="number" min="0" class="entry-input" value="${e.v || 0}"
             onchange="updateEntry('${e.id}','v',this.value)">
-          ${itemInput}
+          ${varInput}${itemInput}
           <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
         </div>`;
       }).join('');
@@ -2136,7 +2156,7 @@
 
     function reportDetailGroups() {
       return [
-        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} reps` })),
+        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} reps` + (e.variation && e.variation !== 'Standard' ? ' · ' + e.variation : '') })),
         ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` })),
         ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
         ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` })),
