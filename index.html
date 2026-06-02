@@ -554,6 +554,14 @@
       border: 1px solid var(--border) !important;
     }
 
+    .btn-endday {
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid var(--accent) !important;
+    }
+
+    .timer-phase.reached { color: var(--green); font-weight: 700; }
+
     .btn-skip {
       background: var(--surface-hover);
       color: var(--text);
@@ -1072,6 +1080,7 @@
           <button class="btn-pause" id="timerPauseBtn" onclick="pauseTimer()" disabled>Pause</button>
           <button class="btn-skip" onclick="skipPhase()">Skip</button>
           <button class="btn-reset" onclick="resetTimer()">Reset</button>
+          <button class="btn-endday" onclick="endWorkDay()">End Day</button>
           <button class="btn-skip" id="soundBtn" onclick="toggleSound()" title="Toggle sound">🔊</button>
         </div>
         <div class="timer-stats">
@@ -2182,7 +2191,7 @@
       let t = getTimer();
       let changed = false;
       const today = dateKey(new Date());
-      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; changed = true; }
+      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.dayEnded = false; changed = true; }
       if (t.running) {
         let transitioned = false, guard = 0;
         while (t.running && Date.now() >= t.endsAt && guard < 5000) { advanceTimer(t); transitioned = true; guard++; }
@@ -2205,9 +2214,11 @@
       const phaseEl = document.getElementById('timerPhase');
       const progressEl = document.getElementById('progressFill');
       const paused = !t.running && t.started;
+      const ended = t.dayEnded && !t.running && !t.started;
       if (phaseEl) {
-        phaseEl.textContent = paused ? label + ' · ⏸ PAUSED' : label;
-        phaseEl.className = 'timer-phase ' + cls + (paused ? ' paused' : '');
+        phaseEl.textContent = ended ? `✓ Work day ended — ${t.periods || 0} period${(t.periods || 0) === 1 ? '' : 's'}`
+          : paused ? label + ' · ⏸ PAUSED' : label;
+        phaseEl.className = 'timer-phase ' + cls + (paused ? ' paused' : '') + (ended ? ' reached' : '');
       }
       if (progressEl) {
         progressEl.className = 'progress-fill ' + cls;
@@ -2230,9 +2241,9 @@
       const t = getTimer();
       if (t.running) return;
       initAudio(); // unlock audio on the user's gesture
-      const rem = (t.started && t.remaining != null) ? t.remaining : phaseDur(t.phase);
-      t.running = true; t.started = true; t.endsAt = Date.now() + rem * 1000;
       if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; }
+      const rem = (t.started && t.remaining != null) ? t.remaining : phaseDur(t.phase);
+      t.running = true; t.started = true; t.dayEnded = false; t.endsAt = Date.now() + rem * 1000;
       saveTimer(t); refreshTimerUI(t);
     }
 
@@ -2261,6 +2272,17 @@
       const t = getTimer();
       t.phase = 'work'; t.running = false; t.started = false; t.remaining = WORK_DURATION; t.endsAt = 0;
       saveTimer(t); refreshTimerUI(t);
+    }
+
+    // End the work day: stop the timer; today's period/work totals stay recorded for the report.
+    function endWorkDay() {
+      const t = getTimer();
+      const mins = Math.floor((t.workSeconds || 0) / 60);
+      if (!confirm(`End your work day?\nRecorded for today: ${t.periods || 0} work period(s), ${mins} min.`)) return;
+      t.running = false; t.started = false; t.dayEnded = true;
+      t.phase = 'work'; t.remaining = WORK_DURATION; t.endsAt = 0;
+      saveTimer(t); // periods & workSeconds are preserved and mirrored to today's record
+      refreshTimerUI(t);
     }
 
     function announcePhase(newPhase) {
