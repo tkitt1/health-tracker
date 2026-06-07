@@ -1834,6 +1834,16 @@
       if (isNaN(ms)) return;
       const o = getIF(); o.start = ms; saveIF(o); renderIF();
     }
+    function toggleEndEdit() {
+      const el = document.getElementById('ifEndEdit');
+      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+    function ifSetEnd(value) {
+      if (!value) return;
+      const ms = new Date(value).getTime();
+      if (isNaN(ms)) return;
+      const o = getIF(); o.end = ms; saveIF(o); renderIF();
+    }
     function setGoal(h) { const o = getIF(); o.goalH = h; saveIF(o); renderIF(); }
     function setGoalDays() {
       const v = parseFloat(document.getElementById('ifDays').value) || 0;
@@ -1891,7 +1901,18 @@
           <div class="if-status">
             <span class="if-meta">Last completed fast</span>
             <div class="if-elapsed">${fmtDur(o.end - o.start)}</div>
-            <div class="if-meta">${fmtClock(o.start)} &rarr; ${fmtClock(o.end)}</div>
+            <div class="if-meta">Started ${fmtClock(o.start)}
+              <span class="view-link" style="margin-left:6px" onclick="toggleStartEdit()">edit</span>
+            </div>
+            <div id="ifStartEdit" style="display:none; margin:6px 0">
+              <input type="datetime-local" value="${toLocalInput(o.start)}" onchange="ifSetStart(this.value)">
+            </div>
+            <div class="if-meta">Ended ${fmtClock(o.end)}
+              <span class="view-link" style="margin-left:6px" onclick="toggleEndEdit()">edit</span>
+            </div>
+            <div id="ifEndEdit" style="display:none; margin:6px 0">
+              <input type="datetime-local" value="${toLocalInput(o.end)}" onchange="ifSetEnd(this.value)">
+            </div>
           </div>
           ${goalRow}
           <div class="if-controls">
