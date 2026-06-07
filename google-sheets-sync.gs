@@ -29,7 +29,7 @@ const SHEET_NAME = 'Daily Tracker';
 // ==================
 
 const HEADERS = [
-  'date', 'pushups', 'squats', 'pullups', 'dips',
+  'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec',
   'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
   'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min'
 ];
@@ -73,7 +73,7 @@ function writeRow_(dateKey, d) {
 
   const vals = [
     dateKey,
-    sum_(d.pushups), sum_(d.squats), sum_(d.pullups), sum_(d.dips),
+    sum_(d.pushups), sum_(d.squats), sum_(d.pullups), sum_(d.dips), sum_(d.deadhang),
     sum_(d.bike, 'time'), sum_(d.bike, 'dist'),
     sum_(d.run, 'time'), sum_(d.run, 'dist'),
     sum_(d.walk, 'time'), sum_(d.walk, 'dist'),

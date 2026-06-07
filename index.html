@@ -1097,6 +1097,7 @@
             <div class="timer-stat-label">Until Long Break</div>
           </div>
         </div>
+        <div class="var-manage"><span class="view-link" style="margin-left:0" onclick="openPeriods()">⚙ Edit work periods</span></div>
       </div>
     </div>
 
@@ -1224,6 +1225,17 @@
     </div>
   </div>
 
+  <!-- Work periods editor -->
+  <div class="modal-overlay" id="periodsOverlay" style="display:none" onclick="if(event.target===this)closePeriods()">
+    <div class="modal">
+      <div class="modal-header">
+        <span>⏱️ Work Periods</span>
+        <button class="modal-close" onclick="closePeriods()">&times;</button>
+      </div>
+      <div class="modal-body" id="periodsBody"></div>
+    </div>
+  </div>
+
   <!-- Variation manager modal -->
   <div class="modal-overlay" id="varOverlay" style="display:none" onclick="if(event.target===this)closeVarManager()">
     <div class="modal">
@@ -1244,6 +1256,7 @@
       { key: 'squats', label: 'Squats', icon: '🦵' },
       { key: 'pullups', label: 'Pull Ups', icon: '🏋️' },
       { key: 'dips', label: 'Dips', icon: '🔻' },
+      { key: 'deadhang', label: 'Dead Hang', icon: '🧗', unit: 'sec' },
     ];
 
     const CARDIO = [
@@ -1279,6 +1292,7 @@
       { label: 'Squats', f: 'squats', u: 'reps' },
       { label: 'Pull Ups', f: 'pullups', u: 'reps' },
       { label: 'Dips', f: 'dips', u: 'reps' },
+      { label: 'Dead Hang', f: 'deadhang', u: 'sec' },
       { label: 'Bike time', f: 'bike', sub: 'time', u: 'min' },
       { label: 'Bike dist', f: 'bike', sub: 'dist', u: 'km' },
       { label: 'Run time', f: 'run', sub: 'time', u: 'min' },
@@ -1671,6 +1685,7 @@
     function renderExercises() {
       const grid = document.getElementById('exerciseGrid');
       grid.innerHTML = EXERCISES.map(ex => {
+        const unit = ex.unit || 'reps';
         const total = sumEntries(ex.key);
         const n = getEntries(ex.key).length;
         return `
@@ -1681,10 +1696,10 @@
               <span class="view-link" onclick="openEntries('${ex.key}','count')">edit${n ? ` (${n})` : ''}</span>
             </div>
             <div class="total-line">
-              <span class="total-value">${total}</span><span class="total-unit">reps</span>
+              <span class="total-value">${total}</span><span class="total-unit">${unit}</span>
             </div>
             <div class="add-row">
-              <input type="number" min="0" placeholder="+ reps" id="${ex.key}_in"
+              <input type="number" min="0" placeholder="+ ${unit}" id="${ex.key}_in"
                 onkeydown="if(event.key==='Enter')addCount('${ex.key}')">
               <button class="add-btn" onclick="addCount('${ex.key}')">Add</button>
             </div>
@@ -2070,6 +2085,7 @@
       squats: ['Standard', 'Sumo', 'Jump', 'Bulgarian', 'Pistol'],
       pullups: ['Standard', 'Wide grip', 'Chin-up', 'Commando', 'Weighted'],
       dips: ['Standard', 'Bench', 'Weighted', 'Ring', 'Forward lean'],
+      deadhang: ['Standard', 'Weighted', 'One-arm', 'Towel', 'Bent-arm'],
       run: ['Standard', 'Easy', 'Tempo', 'Intervals', 'Trail'],
       walk: ['Standard', 'Casual', 'Brisk', 'Incline', 'Treadmill'],
       swim: ['Standard', 'Freestyle', 'Breaststroke', 'Backstroke', 'Kickboard'],
@@ -2175,10 +2191,26 @@
       if (t.running) return Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
       return Math.max(0, t.remaining || 0);
     }
+    // periodLog = [{id, t, mins}] per completed work period; periods/workSeconds derive from it.
+    function ensurePeriodLog(t) {
+      if (!Array.isArray(t.periodLog)) {
+        const n = t.periods || 0;
+        const per = n > 0 ? Math.round((t.workSeconds || 0) / 60 / n) : 0;
+        t.periodLog = [];
+        for (let i = 0; i < n; i++) t.periodLog.push({ id: 'leg' + i, t: 0, mins: per });
+      }
+      return t;
+    }
+    function syncDerived(t) {
+      t.periods = (t.periodLog || []).length;
+      t.workSeconds = (t.periodLog || []).reduce((s, p) => s + (p.mins || 0) * 60, 0);
+    }
+
     function advanceTimer(t) { // current phase ended naturally -> move to next
+      ensurePeriodLog(t);
       if (t.phase === 'work') {
-        t.periods = (t.periods || 0) + 1;
-        t.workSeconds = (t.workSeconds || 0) + WORK_DURATION;
+        t.periodLog.push({ id: genId(), t: t.endsAt, mins: Math.round(WORK_DURATION / 60) });
+        syncDerived(t);
         t.phase = (t.periods % PERIODS_BEFORE_LONG === 0) ? 'long-break' : 'short-break';
       } else {
         t.phase = 'work';
@@ -2257,9 +2289,11 @@
     }
 
     function skipPhase() {
-      const t = getTimer();
-      if (t.phase === 'work') { // count the period, but not a full work-time block (it wasn't completed)
-        t.periods = (t.periods || 0) + 1;
+      const t = ensurePeriodLog(getTimer());
+      if (t.phase === 'work') { // log the period, crediting the minutes actually worked
+        const workedSec = Math.max(0, phaseDur('work') - timerRemainingSec(t));
+        t.periodLog.push({ id: genId(), t: Date.now(), mins: Math.round(workedSec / 60) });
+        syncDerived(t);
         t.phase = (t.periods % PERIODS_BEFORE_LONG === 0) ? 'long-break' : 'short-break';
       } else {
         t.phase = 'work';
@@ -2283,6 +2317,44 @@
       t.phase = 'work'; t.remaining = WORK_DURATION; t.endsAt = 0;
       saveTimer(t); // periods & workSeconds are preserved and mirrored to today's record
       refreshTimerUI(t);
+    }
+
+    // ---- Edit / delete today's work periods ----
+    function openPeriods() { renderPeriods(); document.getElementById('periodsOverlay').style.display = 'flex'; }
+    function closePeriods() { document.getElementById('periodsOverlay').style.display = 'none'; }
+    function renderPeriods() {
+      const t = ensurePeriodLog(getTimer());
+      const log = t.periodLog || [];
+      let html = '<p class="auth-help">Today\'s work periods. Edit the minutes, delete a period, or add one — totals update everywhere.</p>';
+      if (!log.length) {
+        html += '<p class="modal-empty">No work periods logged today.</p>';
+      } else {
+        html += log.map((p, i) => {
+          const time = p.t ? new Date(p.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ('#' + (i + 1));
+          return `<div class="entry-row">
+            <span class="entry-time">${time}</span>
+            <input type="number" min="0" class="entry-input" value="${p.mins || 0}" onchange="editPeriodMins('${p.id}', this.value)"><span class="entry-u">min</span>
+            <button class="entry-del" onclick="deletePeriod('${p.id}')">×</button>
+          </div>`;
+        }).join('');
+      }
+      html += `<div class="add-row" style="margin-top:14px"><button class="add-btn" onclick="addPeriod()">+ Add 30-min period</button></div>`;
+      document.getElementById('periodsBody').innerHTML = html;
+    }
+    function editPeriodMins(id, val) {
+      const t = ensurePeriodLog(getTimer());
+      const p = (t.periodLog || []).find(x => String(x.id) === String(id));
+      if (p) { p.mins = Math.max(0, Math.round(parseFloat(val) || 0)); syncDerived(t); saveTimer(t); refreshTimerUI(t); }
+    }
+    function deletePeriod(id) {
+      const t = ensurePeriodLog(getTimer());
+      t.periodLog = (t.periodLog || []).filter(x => String(x.id) !== String(id));
+      syncDerived(t); saveTimer(t); refreshTimerUI(t); renderPeriods();
+    }
+    function addPeriod() {
+      const t = ensurePeriodLog(getTimer());
+      t.periodLog.push({ id: genId(), t: Date.now(), mins: Math.round(WORK_DURATION / 60) });
+      syncDerived(t); saveTimer(t); refreshTimerUI(t); renderPeriods();
     }
 
     function announcePhase(newPhase) {
@@ -2379,7 +2451,7 @@
     function varSuffix(e) { return (e.variation && e.variation !== 'Standard') ? ' · ' + e.variation : ''; }
     function reportDetailGroups() {
       return [
-        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} reps` + varSuffix(e) })),
+        ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit || 'reps'}` + varSuffix(e) })),
         ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` + varSuffix(e) })),
         ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
         ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` + varSuffix(e) })),
@@ -2492,7 +2564,7 @@
 
     function buildCSV(rows) {
       const cols = [
-        'date', 'pushups', 'squats', 'pullups', 'dips',
+        'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
         'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'workout_notes'
@@ -2508,7 +2580,7 @@
           ? protein.filter(x => x.item).map(x => `${x.v}g ${x.item}`).join('; ') : '';
         const vals = [
           r.date,
-          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips),
+          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips), sumVal(d.deadhang),
           sumVal(d.bike, 'time'), sumVal(d.bike, 'dist'),
           sumVal(d.run, 'time'), sumVal(d.run, 'dist'),
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
