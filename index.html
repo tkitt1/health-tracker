@@ -1273,10 +1273,10 @@
     ];
 
     const CARDIO = [
-      { key: 'bike', label: 'Bike', icon: '🚴', distUnit: 'km', distStep: '0.1' },
-      { key: 'run', label: 'Run', icon: '🏃', distUnit: 'km', distStep: '0.1' },
+      { key: 'bike', label: 'Bike', icon: '🚴', distUnit: 'km', distStep: '0.1', speedUnit: 'km/h' },
+      { key: 'run', label: 'Run', icon: '🏃', distUnit: 'km', distStep: '0.1', speedUnit: 'km/h' },
       { key: 'walk', label: 'Walk', icon: '🚶', distUnit: 'km', distStep: '0.1' },
-      { key: 'swim', label: 'Swim', icon: '🏊', distUnit: 'm', distStep: '10' },
+      { key: 'swim', label: 'Swim', icon: '🏊', distUnit: 'm', distStep: '10', speedUnit: 'm/min' },
     ];
 
     const INTAKE = [
@@ -1728,6 +1728,11 @@
         const time = sumEntries(c.key, 'time');
         const dist = sumEntries(c.key, 'dist');
         const n = getEntries(c.key).length;
+        let speedLine = '';
+        if (c.speedUnit && time > 0 && dist > 0) {
+          const spd = c.speedUnit === 'km/h' ? round(dist * 60 / time) : round(dist / time); // km/h or m/min
+          speedLine = `<div class="if-meta">avg ${spd} ${c.speedUnit}</div>`;
+        }
         return `
           <div class="card">
             <div class="card-header">
@@ -1740,6 +1745,7 @@
               <span class="total-sep">·</span>
               <span class="total-value">${dist}</span><span class="total-unit">${c.distUnit}</span>
             </div>
+            ${speedLine}
             <div class="add-row">
               <input type="number" min="0" placeholder="+ min" id="${c.key}_time_in">
               <input type="number" min="0" step="${c.distStep}" placeholder="+ ${c.distUnit}" id="${c.key}_dist_in">
