@@ -1815,6 +1815,36 @@
     }
     function saveIF(o) { persist('ht_if', JSON.stringify(o)); }
 
+    // Completed fasts are recorded on the day they ENDED, so each day shows its own.
+    function getDayFast(dk) {
+      let d; try { d = JSON.parse(localStorage.getItem('ht_' + dk) || 'null'); } catch (e) {}
+      return (d && d.if_done) ? d.if_done : null;
+    }
+    function setDayFast(dk, fast) {
+      let d = {}; try { d = JSON.parse(localStorage.getItem('ht_' + dk) || '{}'); } catch (e) {}
+      if (fast) d.if_done = fast; else delete d.if_done;
+      persist('ht_' + dk, JSON.stringify(d));
+    }
+    function ifEditDayFast(dk, field, value) {
+      if (!value) return;
+      const ms = new Date(value).getTime();
+      if (isNaN(ms)) return;
+      const f = getDayFast(dk); if (!f) return;
+      f[field] = ms; setDayFast(dk, f); renderIF();
+    }
+    function ifDeleteDayFast(dk) {
+      if (!confirm('Delete this fast record?')) return;
+      setDayFast(dk, null);
+      const o = getIF(); // also clear the global record if it points at this day, so it isn't re-added
+      if (o.start && o.end && dateKey(new Date(o.end)) === dk) { o.start = null; o.end = null; saveIF(o); }
+      renderIF();
+    }
+    function ifLogFast(dk) {
+      const start = new Date(dk + 'T20:00:00').getTime();
+      setDayFast(dk, { start, end: start + 16 * 3600000, goalH: getIF().goalH || 16 });
+      renderIF();
+    }
+
     function fmtDur(ms, withSec) {
       if (ms < 0) ms = 0;
       const total = Math.floor(ms / 1000);
@@ -1831,7 +1861,12 @@
     }
 
     function ifStartNow() { const o = getIF(); o.start = Date.now(); o.end = null; saveIF(o); renderIF(); }
-    function ifEndNow() { const o = getIF(); if (!o.start) return; o.end = Date.now(); saveIF(o); renderIF(); }
+    function ifEndNow() {
+      const o = getIF(); if (!o.start) return;
+      o.end = Date.now(); saveIF(o);
+      setDayFast(dateKey(new Date(o.end)), { start: o.start, end: o.end, goalH: o.goalH || 16 });
+      renderIF();
+    }
     function ifReset() { const o = getIF(); o.start = null; o.end = null; saveIF(o); renderIF(); }
     function ifRestart() {
       if (!confirm('Ate something? This restarts your fast from right now.')) return;
@@ -1887,15 +1922,19 @@
           <span class="if-meta">days</span>
         </div>`;
 
+      // Backfill the global last completed fast into its end-day record (one-time per day).
+      if (o.start && o.end && !getDayFast(dateKey(new Date(o.end)))) {
+        setDayFast(dateKey(new Date(o.end)), { start: o.start, end: o.end, goalH });
+      }
+
+      const today = isToday();
+      const active = !!(o.start && !o.end);
+      const viewedKey = dateKey(currentDate);
+      const dayLabel = currentDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
       let body;
-      if (!o.start) {
-        body = `
-          <div class="if-status"><span class="if-meta">Not currently fasting.</span></div>
-          ${goalRow}
-          <div class="if-controls">
-            <button class="if-btn if-start-btn" onclick="ifStartNow()">Start Now</button>
-          </div>`;
-      } else if (!o.end) {
+
+      if (today && active) {
+        // Live, in-progress fast
         body = `
           <div class="if-status">
             <div class="if-elapsed" id="ifElapsed">--</div>
@@ -1918,28 +1957,43 @@
             <button class="if-btn if-reset-btn" onclick="ifReset()">Reset</button>
           </div>`;
       } else {
-        body = `
-          <div class="if-status">
-            <span class="if-meta">Last completed fast</span>
-            <div class="if-elapsed">${fmtDur(o.end - o.start)}</div>
-            <div class="if-meta">Started ${fmtClock(o.start)}
-              <span class="view-link" style="margin-left:6px" onclick="toggleStartEdit()">edit</span>
+        const fast = getDayFast(viewedKey);
+        if (fast) {
+          body = `
+            <div class="if-status">
+              <span class="if-meta">${today ? 'Completed fast' : 'Fast — ' + dayLabel}</span>
+              <div class="if-elapsed">${fmtDur(fast.end - fast.start)}</div>
+              <div class="if-meta">Started ${fmtClock(fast.start)}
+                <span class="view-link" style="margin-left:6px" onclick="toggleStartEdit()">edit</span>
+              </div>
+              <div id="ifStartEdit" style="display:none; margin:6px 0">
+                <input type="datetime-local" value="${toLocalInput(fast.start)}" onchange="ifEditDayFast('${viewedKey}','start',this.value)">
+              </div>
+              <div class="if-meta">Ended ${fmtClock(fast.end)}
+                <span class="view-link" style="margin-left:6px" onclick="toggleEndEdit()">edit</span>
+              </div>
+              <div id="ifEndEdit" style="display:none; margin:6px 0">
+                <input type="datetime-local" value="${toLocalInput(fast.end)}" onchange="ifEditDayFast('${viewedKey}','end',this.value)">
+              </div>
             </div>
-            <div id="ifStartEdit" style="display:none; margin:6px 0">
-              <input type="datetime-local" value="${toLocalInput(o.start)}" onchange="ifSetStart(this.value)">
-            </div>
-            <div class="if-meta">Ended ${fmtClock(o.end)}
-              <span class="view-link" style="margin-left:6px" onclick="toggleEndEdit()">edit</span>
-            </div>
-            <div id="ifEndEdit" style="display:none; margin:6px 0">
-              <input type="datetime-local" value="${toLocalInput(o.end)}" onchange="ifSetEnd(this.value)">
-            </div>
-          </div>
-          ${goalRow}
-          <div class="if-controls">
-            <button class="if-btn if-start-btn" onclick="ifStartNow()">Start Now</button>
-            <button class="if-btn if-reset-btn" onclick="ifReset()">Reset</button>
-          </div>`;
+            <div class="if-controls">
+              ${today ? `<button class="if-btn if-start-btn" onclick="ifStartNow()">Start Now</button>` : ''}
+              <button class="if-btn if-reset-btn" onclick="ifDeleteDayFast('${viewedKey}')">Delete</button>
+            </div>`;
+        } else if (today) {
+          body = `
+            <div class="if-status"><span class="if-meta">Not currently fasting.</span></div>
+            ${goalRow}
+            <div class="if-controls">
+              <button class="if-btn if-start-btn" onclick="ifStartNow()">Start Now</button>
+            </div>`;
+        } else {
+          body = `
+            <div class="if-status"><span class="if-meta">No fast recorded for ${dayLabel}.</span></div>
+            <div class="if-controls">
+              <button class="if-btn if-start-btn" onclick="ifLogFast('${viewedKey}')">Log a fast</button>
+            </div>`;
+        }
       }
       document.getElementById('ifCard').innerHTML = body;
       updateIFLive();
