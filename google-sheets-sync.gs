@@ -29,9 +29,10 @@ const SHEET_NAME = 'Daily Tracker';
 // ==================
 
 const HEADERS = [
-  'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec',
+  'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds',
   'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
-  'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min'
+  'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min',
+  'weight_kg', 'blood_pressure'
 ];
 
 function appendDailyTotals() {
@@ -73,7 +74,7 @@ function writeRow_(dateKey, d) {
 
   const vals = [
     dateKey,
-    sum_(d.pushups), sum_(d.squats), sum_(d.pullups), sum_(d.dips), sum_(d.deadhang),
+    sum_(d.pushups), sum_(d.squats), sum_(d.pullups), sum_(d.dips), sum_(d.deadhang), sum_(d.kettlebell),
     sum_(d.bike, 'time'), sum_(d.bike, 'dist'),
     sum_(d.run, 'time'), sum_(d.run, 'dist'),
     sum_(d.walk, 'time'), sum_(d.walk, 'dist'),
@@ -81,7 +82,9 @@ function writeRow_(dateKey, d) {
     sum_(d.coffee), sum_(d.creatine), sum_(d.protein),
     Number(d.timer_periods) || 0,
     Math.floor((Number(d.timer_total_work) || 0) / 60),
-    sum_(d.meditation), sum_(d.reading)
+    sum_(d.meditation), sum_(d.reading),
+    (Array.isArray(d.weight) && d.weight.length) ? d.weight[d.weight.length - 1].v : '',
+    (Array.isArray(d.bp) && d.bp.length) ? (d.bp[d.bp.length - 1].sys + '/' + d.bp[d.bp.length - 1].dia) : ''
   ];
 
   // Update today's row if it already exists, otherwise append.

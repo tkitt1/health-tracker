@@ -1107,6 +1107,12 @@
       <div id="intakeSection"></div>
     </div>
 
+    <!-- Measurements -->
+    <div class="section">
+      <div class="section-title">Measurements</div>
+      <div class="card-grid" id="measuresGrid"></div>
+    </div>
+
     <!-- Intermittent Fasting -->
     <div class="section">
       <div class="section-title">Intermittent Fasting</div>
@@ -1257,6 +1263,13 @@
       { key: 'pullups', label: 'Pull Ups', icon: '🏋️' },
       { key: 'dips', label: 'Dips', icon: '🔻' },
       { key: 'deadhang', label: 'Dead Hang', icon: '🧗', unit: 'sec' },
+      { key: 'kettlebell', label: 'Kettle Bell Circuits', icon: '🔔', unit: 'rounds' },
+    ];
+
+    // Body measurements — show the latest reading (not a running total)
+    const MEASURES = [
+      { key: 'weight', label: 'Weight', icon: '⚖️' },
+      { key: 'bp', label: 'Blood Pressure', icon: '🩸' },
     ];
 
     const CARDIO = [
@@ -1293,6 +1306,7 @@
       { label: 'Pull Ups', f: 'pullups', u: 'reps' },
       { label: 'Dips', f: 'dips', u: 'reps' },
       { label: 'Dead Hang', f: 'deadhang', u: 'sec' },
+      { label: 'Kettlebell', f: 'kettlebell', u: 'rounds' },
       { label: 'Bike time', f: 'bike', sub: 'time', u: 'min' },
       { label: 'Bike dist', f: 'bike', sub: 'dist', u: 'km' },
       { label: 'Run time', f: 'run', sub: 'time', u: 'min' },
@@ -1649,7 +1663,7 @@
     }
 
     function metaFor(key) {
-      return [...EXERCISES, ...CARDIO, ...INTAKE, ...MIND].find(m => m.key === key) || { label: key, icon: '' };
+      return [...EXERCISES, ...CARDIO, ...INTAKE, ...MIND, ...MEASURES].find(m => m.key === key) || { label: key, icon: '' };
     }
 
     function addCount(key) {
@@ -1979,6 +1993,58 @@
       }).join('');
     }
 
+    // ---- Body measurements (show latest reading) ----
+    function renderMeasures() {
+      const section = document.getElementById('measuresGrid');
+      if (!section) return;
+      const w = getEntries('weight');
+      const wLast = w[w.length - 1];
+      const wMeta = (wLast && wLast.t) ? 'as of ' + new Date(wLast.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'no reading yet';
+      const b = getEntries('bp');
+      const bLast = b[b.length - 1];
+      const bMeta = (bLast && bLast.t) ? 'as of ' + new Date(bLast.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'no reading yet';
+
+      section.innerHTML = `
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">⚖️</span>
+            <span class="card-label">Weight</span>
+            <span class="view-link" onclick="openEntries('weight','count')">edit${w.length ? ` (${w.length})` : ''}</span>
+          </div>
+          <div class="total-line"><span class="total-value">${wLast ? round(wLast.v) : '—'}</span><span class="total-unit">kg</span></div>
+          <div class="if-meta">${wMeta}</div>
+          <div class="add-row">
+            <input type="number" min="0" step="0.1" placeholder="+ kg" id="weight_in"
+              onkeydown="if(event.key==='Enter')addCount('weight')">
+            <button class="add-btn" onclick="addCount('weight')">Add</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">🩸</span>
+            <span class="card-label">Blood Pressure</span>
+            <span class="view-link" onclick="openEntries('bp','bp')">edit${b.length ? ` (${b.length})` : ''}</span>
+          </div>
+          <div class="total-line"><span class="total-value">${bLast ? (bLast.sys || 0) + '/' + (bLast.dia || 0) : '—'}</span><span class="total-unit">mmHg</span></div>
+          <div class="if-meta">${bMeta}</div>
+          <div class="add-row">
+            <input type="number" min="0" placeholder="sys" id="bp_sys_in">
+            <input type="number" min="0" placeholder="dia" id="bp_dia_in">
+            <button class="add-btn" onclick="addBP()">Add</button>
+          </div>
+        </div>`;
+    }
+
+    function addBP() {
+      const sys = parseFloat(document.getElementById('bp_sys_in').value) || 0;
+      const dia = parseFloat(document.getElementById('bp_dia_in').value) || 0;
+      if (sys <= 0 && dia <= 0) return;
+      const arr = getEntries('bp');
+      arr.push({ id: genId(), t: Date.now(), sys: round(sys), dia: round(dia) });
+      setEntries('bp', arr);
+      render();
+    }
+
     // ---- Workout ideas + daily notes ----
     let lastWorkout = null;
 
@@ -2046,6 +2112,16 @@
             <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
           </div>`;
         }
+        if (modalType === 'bp') {
+          return `<div class="entry-row">
+            <span class="entry-time">${t}</span>
+            <input type="number" min="0" class="entry-input" value="${e.sys || 0}"
+              onchange="updateEntry('${e.id}','sys',this.value)"><span class="entry-u">sys</span>
+            <input type="number" min="0" class="entry-input" value="${e.dia || 0}"
+              onchange="updateEntry('${e.id}','dia',this.value)"><span class="entry-u">dia</span>
+            <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
+          </div>`;
+        }
         const itemInput = withItem
           ? `<input type="text" class="entry-item-input" placeholder="what you ate"
                value="${(e.item || '').replace(/"/g, '&quot;')}"
@@ -2107,6 +2183,7 @@
       pullups: ['Standard', 'Wide grip', 'Chin-up', 'Commando', 'Weighted'],
       dips: ['Standard', 'Bench', 'Weighted', 'Ring', 'Forward lean'],
       deadhang: ['Standard', 'Weighted', 'One-arm', 'Towel', 'Bent-arm'],
+      kettlebell: ['Standard', 'Swings', 'Snatches', 'Clean & Press', 'Goblet'],
       run: ['Standard', 'Easy', 'Tempo', 'Intervals', 'Trail'],
       walk: ['Standard', 'Casual', 'Brisk', 'Incline', 'Treadmill'],
       swim: ['Standard', 'Freestyle', 'Breaststroke', 'Backstroke', 'Kickboard'],
@@ -2476,6 +2553,8 @@
         ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` + varSuffix(e) })),
         ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
         ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` + varSuffix(e) })),
+        { key: 'weight', label: 'Weight', icon: '⚖️', fmt: e => `${e.v} kg` },
+        { key: 'bp', label: 'Blood Pressure', icon: '🩸', fmt: e => `${e.sys || 0}/${e.dia || 0} mmHg` },
       ];
     }
 
@@ -2585,10 +2664,10 @@
 
     function buildCSV(rows) {
       const cols = [
-        'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec',
+        'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'workout_notes'
+        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'blood_pressure', 'workout_notes'
       ];
       const lines = [cols.join(',')];
       rows.forEach(r => {
@@ -2599,16 +2678,20 @@
         const protein = d.protein;
         const proteinItems = Array.isArray(protein)
           ? protein.filter(x => x.item).map(x => `${x.v}g ${x.item}`).join('; ') : '';
+        const w = d.weight;
+        const weightLast = (Array.isArray(w) && w.length) ? round(w[w.length - 1].v) : '';
+        const bpArr = d.bp;
+        const bpLast = (Array.isArray(bpArr) && bpArr.length) ? `${bpArr[bpArr.length - 1].sys || 0}/${bpArr[bpArr.length - 1].dia || 0}` : '';
         const vals = [
           r.date,
-          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips), sumVal(d.deadhang),
+          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips), sumVal(d.deadhang), sumVal(d.kettlebell),
           sumVal(d.bike, 'time'), sumVal(d.bike, 'dist'),
           sumVal(d.run, 'time'), sumVal(d.run, 'dist'),
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
-          sumVal(d.meditation), sumVal(d.reading), d.workout_notes || ''
+          sumVal(d.meditation), sumVal(d.reading), weightLast, bpLast, d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
       });
@@ -2700,6 +2783,7 @@
       renderExercises();
       renderCardio();
       renderIntake();
+      renderMeasures();
       renderIF();
       renderMind();
       renderWorkout();
