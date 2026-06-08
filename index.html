@@ -341,6 +341,7 @@
     .var-manage { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); text-align: center; }
     .entry-row input.entry-input { width: 76px; flex: 0 0 76px; }
     .entry-row input.entry-item-input,
+    .entry-row input.entry-note-input,
     .entry-row select.entry-var-select {
       flex: 1;
       width: auto;
@@ -2107,6 +2108,11 @@
       body.innerHTML = arr.map(e => {
         const t = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
         const varInput = hasVar ? buildVariationSelect(e) : '';
+        const noteInput = hasVar
+          ? `<input type="text" class="entry-note-input" placeholder="details"
+               value="${(e.note || '').replace(/"/g, '&quot;')}"
+               onchange="updateEntryText('${e.id}','note',this.value)">`
+          : '';
         if (modalType === 'cardio') {
           return `<div class="entry-row">
             <span class="entry-time">${t}</span>
@@ -2114,7 +2120,7 @@
               onchange="updateEntry('${e.id}','time',this.value)"><span class="entry-u">min</span>
             <input type="number" min="0" step="${distStep}" class="entry-input" value="${e.dist || 0}"
               onchange="updateEntry('${e.id}','dist',this.value)"><span class="entry-u">${distUnit}</span>
-            ${varInput}
+            ${varInput}${noteInput}
             <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
           </div>`;
         }
@@ -2137,7 +2143,7 @@
           <span class="entry-time">${t}</span>
           <input type="number" min="0" class="entry-input" value="${e.v || 0}"
             onchange="updateEntry('${e.id}','v',this.value)">
-          ${varInput}${itemInput}
+          ${varInput}${itemInput}${noteInput}
           <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
         </div>`;
       }).join('');
@@ -2552,7 +2558,11 @@
       return out;
     }
 
-    function varSuffix(e) { return (e.variation && e.variation !== 'Standard') ? ' · ' + e.variation : ''; }
+    function varSuffix(e) {
+      let s = (e.variation && e.variation !== 'Standard') ? ' · ' + e.variation : '';
+      if (e.note) s += ' — ' + e.note;
+      return s;
+    }
     function reportDetailGroups() {
       return [
         ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit || 'reps'}` + varSuffix(e) })),
