@@ -1270,6 +1270,8 @@
     // Body measurements — show the latest reading (not a running total)
     const MEASURES = [
       { key: 'weight', label: 'Weight', icon: '⚖️' },
+      { key: 'vo2max', label: 'VO2max', icon: '🫁' },
+      { key: 'hrv', label: 'HRV', icon: '💓' },
       { key: 'bp', label: 'Blood Pressure', icon: '🩸' },
     ];
 
@@ -2055,31 +2057,44 @@
     }
 
     // ---- Body measurements (show latest reading) ----
+    // Single-number latest-reading measures; BP is rendered separately below.
+    const SIMPLE_MEASURES = [
+      { key: 'weight', label: 'Weight', icon: '⚖️', unit: 'kg', step: '0.1' },
+      { key: 'vo2max', label: 'VO2max', icon: '🫁', unit: 'ml/kg/min', step: '0.1' },
+      { key: 'hrv', label: 'HRV', icon: '💓', unit: 'ms', step: '1' },
+    ];
+
+    function asOfMeta(last) {
+      return (last && last.t) ? 'as of ' + new Date(last.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'no reading yet';
+    }
+
     function renderMeasures() {
       const section = document.getElementById('measuresGrid');
       if (!section) return;
-      const w = getEntries('weight');
-      const wLast = w[w.length - 1];
-      const wMeta = (wLast && wLast.t) ? 'as of ' + new Date(wLast.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'no reading yet';
-      const b = getEntries('bp');
-      const bLast = b[b.length - 1];
-      const bMeta = (bLast && bLast.t) ? 'as of ' + new Date(bLast.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'no reading yet';
 
-      section.innerHTML = `
+      let html = SIMPLE_MEASURES.map(m => {
+        const arr = getEntries(m.key);
+        const last = arr[arr.length - 1];
+        return `
         <div class="card">
           <div class="card-header">
-            <span class="card-icon">⚖️</span>
-            <span class="card-label">Weight</span>
-            <span class="view-link" onclick="openEntries('weight','count')">edit${w.length ? ` (${w.length})` : ''}</span>
+            <span class="card-icon">${m.icon}</span>
+            <span class="card-label">${m.label}</span>
+            <span class="view-link" onclick="openEntries('${m.key}','count')">edit${arr.length ? ` (${arr.length})` : ''}</span>
           </div>
-          <div class="total-line"><span class="total-value">${wLast ? round(wLast.v) : '—'}</span><span class="total-unit">kg</span></div>
-          <div class="if-meta">${wMeta}</div>
+          <div class="total-line"><span class="total-value">${last ? round(last.v) : '—'}</span><span class="total-unit">${m.unit}</span></div>
+          <div class="if-meta">${asOfMeta(last)}</div>
           <div class="add-row">
-            <input type="number" min="0" step="0.1" placeholder="+ kg" id="weight_in"
-              onkeydown="if(event.key==='Enter')addCount('weight')">
-            <button class="add-btn" onclick="addCount('weight')">Add</button>
+            <input type="number" min="0" step="${m.step}" placeholder="+ ${m.unit}" id="${m.key}_in"
+              onkeydown="if(event.key==='Enter')addCount('${m.key}')">
+            <button class="add-btn" onclick="addCount('${m.key}')">Add</button>
           </div>
-        </div>
+        </div>`;
+      }).join('');
+
+      const b = getEntries('bp');
+      const bLast = b[b.length - 1];
+      html += `
         <div class="card">
           <div class="card-header">
             <span class="card-icon">🩸</span>
@@ -2087,13 +2102,14 @@
             <span class="view-link" onclick="openEntries('bp','bp')">edit${b.length ? ` (${b.length})` : ''}</span>
           </div>
           <div class="total-line"><span class="total-value">${bLast ? (bLast.sys || 0) + '/' + (bLast.dia || 0) : '—'}</span><span class="total-unit">mmHg</span></div>
-          <div class="if-meta">${bMeta}</div>
+          <div class="if-meta">${asOfMeta(bLast)}</div>
           <div class="add-row">
             <input type="number" min="0" placeholder="sys" id="bp_sys_in">
             <input type="number" min="0" placeholder="dia" id="bp_dia_in">
             <button class="add-btn" onclick="addBP()">Add</button>
           </div>
         </div>`;
+      section.innerHTML = html;
     }
 
     function addBP() {
@@ -2641,6 +2657,8 @@
         ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
         ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` + varSuffix(e) })),
         { key: 'weight', label: 'Weight', icon: '⚖️', fmt: e => `${e.v} kg` },
+        { key: 'vo2max', label: 'VO2max', icon: '🫁', fmt: e => `${e.v} ml/kg/min` },
+        { key: 'hrv', label: 'HRV', icon: '💓', fmt: e => `${e.v} ms` },
         { key: 'bp', label: 'Blood Pressure', icon: '🩸', fmt: e => `${e.sys || 0}/${e.dia || 0} mmHg` },
       ];
     }
@@ -2754,7 +2772,7 @@
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'blood_pressure', 'workout_notes'
+        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
       ];
       const lines = [cols.join(',')];
       rows.forEach(r => {
@@ -2765,8 +2783,10 @@
         const protein = d.protein;
         const proteinItems = Array.isArray(protein)
           ? protein.filter(x => x.item).map(x => `${x.v}g ${x.item}`).join('; ') : '';
-        const w = d.weight;
-        const weightLast = (Array.isArray(w) && w.length) ? round(w[w.length - 1].v) : '';
+        const lastV = a => (Array.isArray(a) && a.length) ? round(a[a.length - 1].v) : '';
+        const weightLast = lastV(d.weight);
+        const vo2Last = lastV(d.vo2max);
+        const hrvLast = lastV(d.hrv);
         const bpArr = d.bp;
         const bpLast = (Array.isArray(bpArr) && bpArr.length) ? `${bpArr[bpArr.length - 1].sys || 0}/${bpArr[bpArr.length - 1].dia || 0}` : '';
         const vals = [
@@ -2778,7 +2798,7 @@
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
-          sumVal(d.meditation), sumVal(d.reading), weightLast, bpLast, d.workout_notes || ''
+          sumVal(d.meditation), sumVal(d.reading), weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
       });

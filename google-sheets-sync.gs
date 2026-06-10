@@ -32,7 +32,7 @@ const HEADERS = [
   'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds',
   'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
   'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min',
-  'weight_kg', 'blood_pressure'
+  'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure'
 ];
 
 function appendDailyTotals() {
@@ -84,6 +84,8 @@ function writeRow_(dateKey, d) {
     Math.floor((Number(d.timer_total_work) || 0) / 60),
     sum_(d.meditation), sum_(d.reading),
     (Array.isArray(d.weight) && d.weight.length) ? d.weight[d.weight.length - 1].v : '',
+    (Array.isArray(d.vo2max) && d.vo2max.length) ? d.vo2max[d.vo2max.length - 1].v : '',
+    (Array.isArray(d.hrv) && d.hrv.length) ? d.hrv[d.hrv.length - 1].v : '',
     (Array.isArray(d.bp) && d.bp.length) ? (d.bp[d.bp.length - 1].sys + '/' + d.bp[d.bp.length - 1].dia) : ''
   ];
 
