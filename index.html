@@ -2388,10 +2388,23 @@
       let changed = false;
       const today = dateKey(new Date());
       if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.dayEnded = false; t.endedPeriods = 0; changed = true; }
+      // Self-heal a corrupt/runaway count (>40 periods in a day is physically impossible).
+      if ((t.periods || 0) > 40 || (Array.isArray(t.periodLog) && t.periodLog.length > 40)) {
+        t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.running = false; t.endsAt = 0; changed = true;
+      }
       if (t.running) {
-        let transitioned = false, guard = 0;
-        while (t.running && Date.now() >= t.endsAt && guard < 5000) { advanceTimer(t); transitioned = true; guard++; }
-        if (transitioned) { changed = true; if (!silent) announcePhase(t.phase); }
+        const ABANDON_MS = 60 * 60 * 1000; // running but >1h overdue = app was left/closed → not real work
+        if (Date.now() - t.endsAt > ABANDON_MS) {
+          // Credit only the single phase that legitimately completed, then pause. No phantom catch-up.
+          advanceTimer(t);
+          t.running = false; t.endsAt = 0; t.remaining = phaseDur(t.phase);
+          changed = true;
+        } else {
+          let transitioned = false, guard = 0;
+          while (t.running && Date.now() >= t.endsAt && guard < 8) { advanceTimer(t); transitioned = true; guard++; }
+          if (t.running && Date.now() >= t.endsAt) { t.running = false; t.remaining = 0; } // safety: stop runaway
+          if (transitioned) { changed = true; if (!silent) announcePhase(t.phase); }
+        }
       }
       if (changed) saveTimer(t);
       refreshTimerUI(t);
