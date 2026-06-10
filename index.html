@@ -2387,7 +2387,7 @@
       let t = getTimer();
       let changed = false;
       const today = dateKey(new Date());
-      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.dayEnded = false; changed = true; }
+      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.dayEnded = false; t.endedPeriods = 0; changed = true; }
       if (t.running) {
         let transitioned = false, guard = 0;
         while (t.running && Date.now() >= t.endsAt && guard < 5000) { advanceTimer(t); transitioned = true; guard++; }
@@ -2412,7 +2412,7 @@
       const paused = !t.running && t.started;
       const ended = t.dayEnded && !t.running && !t.started;
       if (phaseEl) {
-        phaseEl.textContent = ended ? `✓ Work day ended — ${t.periods || 0} period${(t.periods || 0) === 1 ? '' : 's'}`
+        phaseEl.textContent = ended ? `✓ Work day ended — ${t.endedPeriods || 0} period${(t.endedPeriods || 0) === 1 ? '' : 's'}`
           : paused ? label + ' · ⏸ PAUSED' : label;
         phaseEl.className = 'timer-phase ' + cls + (paused ? ' paused' : '') + (ended ? ' reached' : '');
       }
@@ -2437,7 +2437,7 @@
       const t = getTimer();
       if (t.running) return;
       initAudio(); // unlock audio on the user's gesture
-      if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; }
+      if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.endedPeriods = 0; }
       const rem = (t.started && t.remaining != null) ? t.remaining : phaseDur(t.phase);
       t.running = true; t.started = true; t.dayEnded = false; t.endsAt = Date.now() + rem * 1000;
       saveTimer(t); refreshTimerUI(t);
@@ -2475,11 +2475,15 @@
     // End the work day: stop the timer; today's period/work totals stay recorded for the report.
     function endWorkDay() {
       const t = getTimer();
+      const finalPeriods = t.periods || 0;
       const mins = Math.floor((t.workSeconds || 0) / 60);
-      if (!confirm(`End your work day?\nRecorded for today: ${t.periods || 0} work period(s), ${mins} min.`)) return;
-      t.running = false; t.started = false; t.dayEnded = true;
+      if (!confirm(`End your work day?\nRecorded for today: ${finalPeriods} work period(s), ${mins} min.`)) return;
+      mirrorDailyStats(t); // lock today's total into the per-day record (for the Report/History)
+      // Reset the live counter to zero for the next day; keep the recorded total above.
+      t.periods = 0; t.workSeconds = 0; t.periodLog = [];
+      t.running = false; t.started = false; t.dayEnded = true; t.endedPeriods = finalPeriods;
       t.phase = 'work'; t.remaining = WORK_DURATION; t.endsAt = 0;
-      saveTimer(t); // periods & workSeconds are preserved and mirrored to today's record
+      persist('ht_timer', JSON.stringify(t)); // persist WITHOUT mirroring (0 would overwrite the locked total)
       refreshTimerUI(t);
     }
 
