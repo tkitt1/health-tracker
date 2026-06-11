@@ -394,6 +394,12 @@
     }
     .workout-notes:focus { border-color: var(--accent); }
 
+    /* Workout Ideas card sits in the empty cells of the Exercise grid */
+    .exercise-workout { grid-column: span 2; display: flex; flex-direction: column; }
+    .exercise-workout .workout-suggestion { margin-bottom: 10px; }
+    .exercise-workout .workout-notes { flex: 1; min-height: 70px; margin-top: 10px; }
+    @media (max-width: 600px) { .exercise-workout { grid-column: 1 / -1; } }
+
     /* Entries modal */
     .modal-overlay {
       position: fixed;
@@ -1059,21 +1065,6 @@
       <div class="card-grid" id="exerciseGrid"></div>
     </div>
 
-    <!-- Workout Ideas -->
-    <div class="section">
-      <div class="section-title">Workout Ideas</div>
-      <div class="workout-card">
-        <div class="workout-controls">
-          <button class="add-btn workout-btn" onclick="randomWorkout()">🎲 Random Workout</button>
-        </div>
-        <div class="workout-suggestion" id="workoutSuggestion" style="display:none">
-          <span id="workoutText"></span>
-          <button class="view-link" onclick="logWorkout()">＋ add to notes</button>
-        </div>
-        <textarea id="workoutNotes" class="workout-notes" placeholder="Workout notes for the day…"
-          onchange="saveField('workout_notes', this.value)"></textarea>
-      </div>
-    </div>
 
     <!-- Cardio -->
     <div class="section">
@@ -1721,7 +1712,25 @@
               <button class="add-btn" onclick="addCount('${ex.key}')">Add</button>
             </div>
           </div>`;
-      }).join('');
+      }).join('') + workoutCardMarkup();
+    }
+
+    // Workout Ideas card — lives in the empty cells of the Exercise grid
+    function workoutCardMarkup() {
+      return `
+        <div class="card workout-card exercise-workout">
+          <div class="card-header">
+            <span class="card-icon">🎲</span>
+            <span class="card-label">Workout Ideas</span>
+            <button class="add-btn workout-btn" style="margin-left:auto" onclick="randomWorkout()">Random</button>
+          </div>
+          <div class="workout-suggestion" id="workoutSuggestion" style="display:none">
+            <span id="workoutText"></span>
+            <button class="view-link" onclick="logWorkout()">＋ add to notes</button>
+          </div>
+          <textarea id="workoutNotes" class="workout-notes" placeholder="Workout notes for the day…"
+            onchange="saveField('workout_notes', this.value)"></textarea>
+        </div>`;
     }
 
     // Cardio (field entry, km)
