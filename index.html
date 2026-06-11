@@ -1059,6 +1059,12 @@
       <div class="card-grid" id="exerciseGrid"></div>
     </div>
 
+    <!-- Measurements -->
+    <div class="section">
+      <div class="section-title">Measurements</div>
+      <div class="card-grid" id="measuresGrid"></div>
+    </div>
+
     <!-- Cardio -->
     <div class="section">
       <div class="section-title">Cardio</div>
@@ -1108,11 +1114,6 @@
       <div id="intakeSection"></div>
     </div>
 
-    <!-- Measurements -->
-    <div class="section">
-      <div class="section-title">Measurements</div>
-      <div class="card-grid" id="measuresGrid"></div>
-    </div>
 
     <!-- Intermittent Fasting -->
     <div class="section">
@@ -1260,7 +1261,7 @@
   <script>
     const EXERCISES = [
       { key: 'pushups', label: 'Pushups', icon: '💪' },
-      { key: 'squats', label: 'Squats', icon: '🦵' },
+      { key: 'squats', label: 'Squats/Lunges', icon: '🦵' },
       { key: 'pullups', label: 'Pull Ups', icon: '🏋️' },
       { key: 'dips', label: 'Dips', icon: '🔻' },
       { key: 'deadhang', label: 'Dead Hang', icon: '🧗', unit: 'sec' },
@@ -1305,7 +1306,7 @@
 
     const REPORT_ROWS = [
       { label: 'Pushups', f: 'pushups', u: 'reps' },
-      { label: 'Squats', f: 'squats', u: 'reps' },
+      { label: 'Squats/Lunges', f: 'squats', u: 'reps' },
       { label: 'Pull Ups', f: 'pullups', u: 'reps' },
       { label: 'Dips', f: 'dips', u: 'reps' },
       { label: 'Dead Hang', f: 'deadhang', u: 'sec' },
