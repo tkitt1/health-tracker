@@ -1280,6 +1280,8 @@
       { key: 'dips', label: 'Dips', icon: '🔻' },
       { key: 'deadhang', label: 'Dead Hang', icon: '🧗', unit: 'sec' },
       { key: 'kettlebell', label: 'Kettle Bell Circuits', icon: '🔔', unit: 'rounds' },
+      { key: 'sprints', label: 'Sprints', icon: '💨', unit: 'reps' },
+      { key: 'jumprope', label: 'Jump Rope', icon: '🪢', unit: 'reps' },
     ];
 
     // Body measurements — show the latest reading (not a running total)
@@ -1303,21 +1305,6 @@
       { key: 'protein', label: 'Protein', icon: '🥩', unit: 'g', withItem: true },
     ];
 
-    const WORKOUTS = [
-      '3 rounds — 15 pushups, 20 squats, 10 dips',
-      '5 rounds — 10 pullups, 15 pushups',
-      'EMOM 10 min — 8 pushups + 12 squats each minute',
-      'Tabata squats — 20s on / 10s off × 8 rounds',
-      '100 pushups spread through the day',
-      '4 rounds — 20 squats, 10 dips, 30s plank',
-      'Pyramid pushups — 1,2,3…10, then back down',
-      '20 min walk + 30 squats every 5 min',
-      '50 squats, 40 pushups, 30 dips, 20 pullups, 10 burpees',
-      '3 rounds — 1 min plank, 20 squats, 10 pushups',
-      'Death by pushups — +1 rep each minute until you cap',
-      '5 rounds — 30s sprint / 90s easy on the bike',
-    ];
-
     const REPORT_ROWS = [
       { label: 'Pushups', f: 'pushups', u: 'reps' },
       { label: 'Squats/Lunges', f: 'squats', u: 'reps' },
@@ -1325,6 +1312,8 @@
       { label: 'Dips', f: 'dips', u: 'reps' },
       { label: 'Dead Hang', f: 'deadhang', u: 'sec' },
       { label: 'Kettlebell', f: 'kettlebell', u: 'rounds' },
+      { label: 'Sprints', f: 'sprints', u: 'reps' },
+      { label: 'Jump Rope', f: 'jumprope', u: 'reps' },
       { label: 'Bike time', f: 'bike', sub: 'time', u: 'min' },
       { label: 'Bike dist', f: 'bike', sub: 'dist', u: 'km' },
       { label: 'Run time', f: 'run', sub: 'time', u: 'min' },
@@ -1856,25 +1845,7 @@
               <button class="add-btn" onclick="addCount('${ex.key}')">Add</button>
             </div>
           </div>`;
-      }).join('') + workoutCardMarkup();
-    }
-
-    // Workout Ideas card — lives in the empty cells of the Exercise grid
-    function workoutCardMarkup() {
-      return `
-        <div class="card workout-card exercise-workout">
-          <div class="card-header">
-            <span class="card-icon">🎲</span>
-            <span class="card-label">Workout Ideas</span>
-            <button class="add-btn workout-btn" style="margin-left:auto" onclick="randomWorkout()">Random</button>
-          </div>
-          <div class="workout-suggestion" id="workoutSuggestion" style="display:none">
-            <span id="workoutText"></span>
-            <button class="view-link" onclick="logWorkout()">＋ add to notes</button>
-          </div>
-          <textarea id="workoutNotes" class="workout-notes" placeholder="Workout notes for the day…"
-            onchange="saveField('workout_notes', this.value)"></textarea>
-        </div>`;
+      }).join('');
     }
 
     // Cardio (field entry, km)
@@ -2275,31 +2246,6 @@
       render();
     }
 
-    // ---- Workout ideas + daily notes ----
-    let lastWorkout = null;
-
-    function randomWorkout() {
-      let pick;
-      do { pick = WORKOUTS[Math.floor(Math.random() * WORKOUTS.length)]; }
-      while (WORKOUTS.length > 1 && pick === lastWorkout);
-      lastWorkout = pick;
-      document.getElementById('workoutText').textContent = pick;
-      document.getElementById('workoutSuggestion').style.display = 'flex';
-    }
-
-    function logWorkout() {
-      const txt = document.getElementById('workoutText').textContent;
-      if (!txt) return;
-      const ta = document.getElementById('workoutNotes');
-      ta.value = (ta.value ? ta.value + '\n' : '') + '• ' + txt;
-      saveField('workout_notes', ta.value);
-    }
-
-    function renderWorkout() {
-      document.getElementById('workoutNotes').value = getField('workout_notes', '');
-      document.getElementById('workoutSuggestion').style.display = 'none';
-    }
-
     // ---- Entries modal (view / edit / delete individual entries) ----
     let modalKey = null, modalType = null;
 
@@ -2419,6 +2365,8 @@
       dips: ['Standard', 'Bench', 'Weighted', 'Ring', 'Forward lean'],
       deadhang: ['Standard', 'Weighted', 'One-arm', 'Towel', 'Bent-arm'],
       kettlebell: ['Standard', 'Swings', 'Snatches', 'Clean & Press', 'Goblet'],
+      sprints: ['Standard', 'Hill', 'Flat', '100m', 'Resisted'],
+      jumprope: ['Standard', 'Double-under', 'Criss-cross', 'High knees', 'Boxer step'],
       run: ['Standard', 'Easy', 'Tempo', 'Intervals', 'Trail'],
       walk: ['Standard', 'Casual', 'Brisk', 'Incline', 'Treadmill'],
       swim: ['Standard', 'Freestyle', 'Breaststroke', 'Backstroke', 'Kickboard'],
@@ -2942,7 +2890,7 @@
 
     function buildCSV(rows) {
       const cols = [
-        'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds',
+        'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
         'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
@@ -2964,7 +2912,7 @@
         const bpLast = (Array.isArray(bpArr) && bpArr.length) ? `${bpArr[bpArr.length - 1].sys || 0}/${bpArr[bpArr.length - 1].dia || 0}` : '';
         const vals = [
           r.date,
-          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips), sumVal(d.deadhang), sumVal(d.kettlebell),
+          sumVal(d.pushups), sumVal(d.squats), sumVal(d.pullups), sumVal(d.dips), sumVal(d.deadhang), sumVal(d.kettlebell), sumVal(d.sprints), sumVal(d.jumprope),
           sumVal(d.bike, 'time'), sumVal(d.bike, 'dist'),
           sumVal(d.run, 'time'), sumVal(d.run, 'dist'),
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
@@ -3066,7 +3014,6 @@
       renderMeasures();
       renderIF();
       renderMind();
-      renderWorkout();
       refreshTimerUI();
       updateSoundBtn();
     }
