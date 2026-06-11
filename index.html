@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Daily Performance Tracker</title>
+  <title>My Performance Tracker</title>
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -71,16 +71,14 @@
       margin: 0 auto;
     }
 
-    header {
+    header { padding: 20px 0 24px; }
+    .header-top {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       flex-wrap: wrap;
-      gap: 14px;
-      padding: 20px 0 28px;
-      text-align: left;
+      gap: 12px;
     }
-    .header-left { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
     .header-right {
       display: flex;
       align-items: center;
@@ -114,14 +112,13 @@
     .date-nav {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      gap: 16px;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
     }
 
     @media (max-width: 640px) {
-      header { flex-direction: column; align-items: center; text-align: center; }
-      .header-left { align-items: center; }
-      .date-nav { justify-content: center; }
+      .header-top { flex-direction: column; align-items: center; text-align: center; }
       .header-right { justify-content: center; }
     }
 
@@ -145,9 +142,11 @@
     .date-nav .date-display {
       font-size: 1rem;
       color: var(--text-muted);
-      min-width: 160px;
+      min-width: 110px;
       text-align: center;
+      cursor: pointer;
     }
+    .date-nav .date-display:hover { color: var(--text); }
 
     .section {
       margin-bottom: 24px;
@@ -1064,18 +1063,18 @@
 <body>
   <div class="container">
     <header>
-      <div class="header-left">
-        <h1>My Daily Performance Tracker</h1>
-        <div class="date-nav">
-          <button onclick="changeDate(-1)">&#8249;</button>
-          <span class="date-display" id="dateDisplay" onclick="openCalendar()" title="Pick a date"></span>
-          <button onclick="changeDate(1)">&#8250;</button>
-          <button onclick="openCalendar()" title="Pick a date">📅</button>
+      <div class="header-top">
+        <h1>My Performance Tracker</h1>
+        <div class="header-right">
+          <div class="auth-bar" id="authBar"></div>
+          <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓 Auto</button>
         </div>
       </div>
-      <div class="header-right">
-        <div class="auth-bar" id="authBar"></div>
-        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓 Auto</button>
+      <div class="date-nav">
+        <button onclick="changeDate(-1)">&#8249;</button>
+        <span class="date-display" id="dateDisplay" onclick="goToToday()" title="Back to today"></span>
+        <button onclick="changeDate(1)">&#8250;</button>
+        <button onclick="openCalendar()" title="Pick a date">📅</button>
       </div>
     </header>
 
@@ -1417,6 +1416,7 @@
       });
       metaSet(m);
       if (toPush.length) { try { await sb.from('tracker_data').upsert(toPush, { onConflict: 'user_id,key' }); } catch (e) {} }
+      updateAuthBar(); // reflect a pulled "passkey added" flag
       if (pulledChange) render(); // only re-render when remote actually brought new data
     }
 
@@ -1470,13 +1470,14 @@
     function passkeysAvailable() {
       return !!(sb && sb.auth && typeof sb.auth.signInWithPasskey === 'function' && window.PublicKeyCredential);
     }
+    function hasPasskey() { return localStorage.getItem('ht_passkey_added') === '1'; }
 
     function updateAuthBar() {
       const el = document.getElementById('authBar');
       if (!el) return;
       if (!syncConfigured()) { el.innerHTML = '<span class="auth-note">Cloud sync not set up</span>'; return; }
       if (currentUser) {
-        const passkeyLink = passkeysAvailable()
+        const passkeyLink = (passkeysAvailable() && !hasPasskey())
           ? `<button class="auth-link" onclick="doRegisterPasskey()">Add passkey</button>` : '';
         el.innerHTML = `<span class="auth-note">☁ Synced · ${currentUser.email}</span>
           ${passkeyLink}
@@ -1492,6 +1493,8 @@
       try {
         const { error } = await sb.auth.registerPasskey();
         if (error) { alert('Passkey setup failed: ' + error.message); return; }
+        persist('ht_passkey_added', '1'); // remember (and sync) so "Add passkey" hides
+        updateAuthBar();
         alert('Passkey added! Next time, tap “Use a passkey” and sign in with Face ID / Touch ID.');
       } catch (e) { alert('Passkey setup was cancelled or failed.'); }
     }
@@ -1694,6 +1697,10 @@
 
     function changeDate(offset) {
       currentDate.setDate(currentDate.getDate() + offset);
+      render();
+    }
+    function goToToday() {
+      currentDate = new Date();
       render();
     }
 
