@@ -78,20 +78,18 @@
     }
 
     .theme-toggle {
-      position: absolute;
-      top: 0;
-      right: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
+      padding: 7px 16px;
+      border-radius: 999px;
       cursor: pointer;
-      font-size: 1.05rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 600;
     }
     .theme-toggle:hover { background: var(--surface-hover); }
 
@@ -1048,7 +1046,6 @@
 <body>
   <div class="container">
     <header>
-      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light / dark">🌙</button>
       <h1>My Daily Performance Tracker</h1>
       <div class="date-nav">
         <button onclick="changeDate(-1)">&#8249;</button>
@@ -1057,6 +1054,7 @@
         <button onclick="openCalendar()" title="Pick a date">📅</button>
       </div>
       <div class="auth-bar" id="authBar"></div>
+      <div><button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓 Auto</button></div>
     </header>
 
     <!-- Exercise Counters -->
@@ -2991,7 +2989,7 @@
       const b = document.getElementById('themeToggle');
       if (!b) return;
       const m = themeMode();
-      b.textContent = m === 'auto' ? '🌓' : (m === 'light' ? '☀️' : '🌙');
+      b.textContent = m === 'auto' ? '🌓 Auto' : (m === 'light' ? '☀️ Light' : '🌙 Dark');
       b.title = m === 'auto' ? 'Theme: Auto (follows your device) — tap for Light'
         : m === 'light' ? 'Theme: Light — tap for Dark'
           : 'Theme: Dark — tap for Auto';
