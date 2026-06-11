@@ -2537,8 +2537,11 @@
     }
 
     function announceFiveMin() {
-      const spoke = speak('5 minutes left in work period');
-      if (!spoke && soundEnabled) { beep(880, 0, 0.1, 0.25, 'sine'); beep(880, 0.16, 0.1, 0.25, 'sine'); }
+      if (soundEnabled) {
+        initAudio();
+        beep(880, 0, 0.12, 0.32, 'sine'); beep(880, 0.18, 0.14, 0.32, 'sine'); // chime (mixes over music)
+        setTimeout(() => speak('5 minutes left in work period'), 380);
+      }
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Health Tracker', { body: '5 minutes left in work period' });
       }
@@ -2680,8 +2683,9 @@
       if (endedPhase === 'work') { phrase = 'Work period ended'; body = 'Work period ended — take a break!'; }
       else if (endedPhase === 'long-break') { phrase = 'Long break period ended'; body = 'Long break ended — time to work!'; }
       else { phrase = 'Break ended'; body = 'Break ended — time to work!'; } // short-break
-      const spoke = speak(phrase); // female voice says the phrase
-      if (!spoke) playAlert(backToWork); // fall back to the chime if speech isn't available/muted
+      initAudio();             // wake the audio context (it can get suspended while other apps play audio)
+      playAlert(backToWork);   // chime first — Web Audio mixes over background music far more reliably than speech
+      setTimeout(() => speak(phrase), 700); // then the spoken phrase (after the chime, so they don't muddle)
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Health Tracker', { body });
       }
