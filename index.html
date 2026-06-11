@@ -2547,6 +2547,7 @@
         t.phase = (t.periods % PERIODS_BEFORE_LONG === 0) ? 'long-break' : 'short-break';
       } else {
         t.phase = 'work';
+        t.warned5 = false; // new work period -> re-arm the 5-min warning
       }
       t.endsAt = t.endsAt + phaseDur(t.phase) * 1000; // next phase began when the last ended
     }
@@ -2556,7 +2557,7 @@
       let t = getTimer();
       let changed = false;
       const today = dateKey(new Date());
-      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.dayEnded = false; t.endedPeriods = 0; changed = true; }
+      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.dayEnded = false; t.endedPeriods = 0; t.warned5 = false; changed = true; }
       // Self-heal a corrupt/runaway count (>40 periods in a day is physically impossible).
       if ((t.periods || 0) > 40 || (Array.isArray(t.periodLog) && t.periodLog.length > 40)) {
         t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.running = false; t.endsAt = 0; changed = true;
@@ -2575,8 +2576,24 @@
           if (transitioned) { changed = true; if (!silent) announcePhase(t.phase); }
         }
       }
+      // "5 minutes left" heads-up, once per work period.
+      if (t.running && t.phase === 'work') {
+        const remaining = Math.round((t.endsAt - Date.now()) / 1000);
+        if (remaining > 0 && remaining <= 300 && !t.warned5) {
+          t.warned5 = true; changed = true;
+          if (!silent) announceFiveMin(); // (silent reconcile on load just sets the flag, no announcement)
+        }
+      }
       if (changed) saveTimer(t);
       refreshTimerUI(t);
+    }
+
+    function announceFiveMin() {
+      const spoke = speak('5 minutes left in work period');
+      if (!spoke && soundEnabled) { beep(880, 0, 0.1, 0.25, 'sine'); beep(880, 0.16, 0.1, 0.25, 'sine'); }
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Health Tracker', { body: '5 minutes left in work period' });
+      }
     }
 
     function refreshTimerUI(t) {
@@ -2643,6 +2660,7 @@
         t.phase = (t.periods % PERIODS_BEFORE_LONG === 0) ? 'long-break' : 'short-break';
       } else {
         t.phase = 'work';
+        t.warned5 = false;
       }
       t.running = false; t.started = false; t.remaining = phaseDur(t.phase); t.endsAt = 0;
       saveTimer(t); refreshTimerUI(t);
@@ -2650,7 +2668,7 @@
 
     function resetTimer() {
       const t = getTimer();
-      t.phase = 'work'; t.running = false; t.started = false; t.remaining = WORK_DURATION; t.endsAt = 0;
+      t.phase = 'work'; t.running = false; t.started = false; t.remaining = WORK_DURATION; t.endsAt = 0; t.warned5 = false;
       saveTimer(t); refreshTimerUI(t);
     }
 
