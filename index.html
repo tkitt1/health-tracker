@@ -2518,10 +2518,10 @@
           t.running = false; t.endsAt = 0; t.remaining = phaseDur(t.phase);
           changed = true;
         } else {
-          let transitioned = false, guard = 0;
-          while (t.running && Date.now() >= t.endsAt && guard < 8) { advanceTimer(t); transitioned = true; guard++; }
+          let transitioned = false, guard = 0, endedPhase = null;
+          while (t.running && Date.now() >= t.endsAt && guard < 8) { endedPhase = t.phase; advanceTimer(t); transitioned = true; guard++; }
           if (t.running && Date.now() >= t.endsAt) { t.running = false; t.remaining = 0; } // safety: stop runaway
-          if (transitioned) { changed = true; if (!silent) announcePhase(t.phase); }
+          if (transitioned) { changed = true; if (!silent) announcePhase(endedPhase); }
         }
       }
       // "5 minutes left" heads-up, once per work period.
@@ -2673,13 +2673,17 @@
       syncDerived(t); saveTimer(t); refreshTimerUI(t); renderPeriods();
     }
 
-    function announcePhase(newPhase) {
-      const backToWork = newPhase === 'work';
-      const phrase = backToWork ? 'Break ended' : 'Work period ended';
+    // endedPhase = the phase that just finished
+    function announcePhase(endedPhase) {
+      const backToWork = endedPhase !== 'work'; // a break ended -> back to work
+      let phrase, body;
+      if (endedPhase === 'work') { phrase = 'Work period ended'; body = 'Work period ended — take a break!'; }
+      else if (endedPhase === 'long-break') { phrase = 'Long break period ended'; body = 'Long break ended — time to work!'; }
+      else { phrase = 'Break ended'; body = 'Break ended — time to work!'; } // short-break
       const spoke = speak(phrase); // female voice says the phrase
       if (!spoke) playAlert(backToWork); // fall back to the chime if speech isn't available/muted
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Health Tracker', { body: backToWork ? 'Break ended — time to work!' : 'Work period ended — take a break!' });
+        new Notification('Health Tracker', { body });
       }
     }
 
