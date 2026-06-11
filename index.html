@@ -1480,7 +1480,7 @@
       if (currentUser) {
         const passkeyLink = (passkeysAvailable() && !hasPasskey())
           ? `<button class="auth-link" onclick="doRegisterPasskey()">Add passkey</button>` : '';
-        el.innerHTML = `<span class="auth-note">☁ Synced · ${currentUser.email}</span>
+        el.innerHTML = `<span class="auth-note">☁ Synced</span>
           ${passkeyLink}
           <button class="auth-link" onclick="doSignOut()">Sign out</button>`;
       } else {
