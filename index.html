@@ -1538,12 +1538,12 @@
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    function beep(freq, startOffset, duration, vol) {
+    function beep(freq, startOffset, duration, vol, type) {
       if (!audioCtx) return;
       const t0 = audioCtx.currentTime + startOffset;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = 'sine';
+      osc.type = type || 'sine';
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.0001, t0);
       gain.gain.linearRampToValueAtTime(vol, t0 + 0.02);
@@ -1553,19 +1553,23 @@
       osc.stop(t0 + duration + 0.02);
     }
 
-    // backToWork=true -> a break just ended (energizing rising chime)
-    // backToWork=false -> a work period just ended (gentle falling chime)
+    // backToWork=true  -> a BREAK just ended: bright, urgent rising alarm (get back to work)
+    // backToWork=false -> a WORK period just ended: soft descending bell (time to relax)
     function playAlert(backToWork) {
       if (!soundEnabled) return;
       initAudio();
       if (!audioCtx) return;
       if (backToWork) {
-        beep(523, 0,    0.16, 0.3);
-        beep(659, 0.18, 0.16, 0.3);
-        beep(880, 0.36, 0.32, 0.35);
+        // energetic "beep-beep · beep-beeep" rising alarm (triangle)
+        beep(660, 0.00, 0.11, 0.32, 'triangle');
+        beep(990, 0.13, 0.11, 0.32, 'triangle');
+        beep(660, 0.30, 0.11, 0.32, 'triangle');
+        beep(990, 0.43, 0.22, 0.36, 'triangle');
       } else {
-        beep(784, 0,    0.22, 0.3);
-        beep(523, 0.24, 0.42, 0.3);
+        // calm descending bell chime (sine)
+        beep(880, 0.00, 0.32, 0.30, 'sine');
+        beep(659, 0.28, 0.36, 0.28, 'sine');
+        beep(440, 0.60, 0.60, 0.26, 'sine');
       }
     }
 
