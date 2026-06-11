@@ -1163,6 +1163,10 @@
         <button class="modal-close" onclick="closeAuth()">&times;</button>
       </div>
       <div class="modal-body">
+        <div id="passkeyStep" style="display:none; margin-bottom:14px">
+          <button class="if-btn if-start-btn" style="width:100%" onclick="doPasskeySignIn()">🔑 Use a passkey</button>
+          <div class="auth-help" style="text-align:center; margin:10px 0 0">— or sign in with your email —</div>
+        </div>
         <p class="auth-help">Enter your email and we'll send a 6-digit code (plus a magic link) — no password. On mobile, the <strong>code</strong> is the most reliable. Use the same email on every device to sync.</p>
         <input type="email" id="authEmail" class="auth-input" placeholder="email" autocomplete="email">
         <div class="auth-actions">
@@ -1413,7 +1417,7 @@
       updateAuthBar();
       if (!syncConfigured()) return;
       sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, experimental: { passkey: true } }
       });
       try {
         const { data } = await sb.auth.getSession();
@@ -1439,16 +1443,45 @@
     }
 
     // ---- Auth UI ----
+    function passkeysAvailable() {
+      return !!(sb && sb.auth && typeof sb.auth.signInWithPasskey === 'function' && window.PublicKeyCredential);
+    }
+
     function updateAuthBar() {
       const el = document.getElementById('authBar');
       if (!el) return;
       if (!syncConfigured()) { el.innerHTML = '<span class="auth-note">Cloud sync not set up</span>'; return; }
       if (currentUser) {
+        const passkeyLink = passkeysAvailable()
+          ? `<button class="auth-link" onclick="doRegisterPasskey()">Add passkey</button>` : '';
         el.innerHTML = `<span class="auth-note">☁ Synced · ${currentUser.email}</span>
+          ${passkeyLink}
           <button class="auth-link" onclick="doSignOut()">Sign out</button>`;
       } else {
         el.innerHTML = `<button class="auth-link" onclick="openAuth()">☁ Sign in to sync</button>`;
       }
+    }
+
+    // Register a passkey on this device (must be signed in first).
+    async function doRegisterPasskey() {
+      if (!passkeysAvailable()) { alert('Passkeys are not available in this browser/version.'); return; }
+      try {
+        const { error } = await sb.auth.registerPasskey();
+        if (error) { alert('Passkey setup failed: ' + error.message); return; }
+        alert('Passkey added! Next time, tap “Use a passkey” and sign in with Face ID / Touch ID.');
+      } catch (e) { alert('Passkey setup was cancelled or failed.'); }
+    }
+
+    // Sign in using a passkey (Face ID / Touch ID / security key).
+    async function doPasskeySignIn() {
+      const msg = document.getElementById('authMsg');
+      if (!passkeysAvailable()) { msg.style.color = ''; msg.textContent = 'Passkeys not available here — use the email code.'; return; }
+      msg.style.color = ''; msg.textContent = 'Authenticating…';
+      try {
+        const { error } = await sb.auth.signInWithPasskey();
+        if (error) { msg.textContent = error.message; return; }
+        closeAuth();
+      } catch (e) { msg.textContent = 'Passkey sign-in was cancelled.'; }
     }
 
     function openAuth() {
@@ -1456,6 +1489,7 @@
       msg.textContent = ''; msg.style.color = '';
       document.getElementById('otpStep').style.display = 'none';
       document.getElementById('authCode').value = '';
+      document.getElementById('passkeyStep').style.display = passkeysAvailable() ? 'block' : 'none';
       document.getElementById('authOverlay').style.display = 'flex';
     }
     function closeAuth() { document.getElementById('authOverlay').style.display = 'none'; }
