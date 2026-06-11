@@ -72,16 +72,28 @@
     }
 
     header {
-      text-align: center;
-      padding: 24px 0 32px;
-      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      padding: 20px 0 28px;
+      text-align: left;
     }
+    .header-left { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+    .header-right {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .header-right .auth-bar { margin-top: 0; }
 
     .theme-toggle {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      margin-top: 12px;
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
@@ -94,7 +106,7 @@
     .theme-toggle:hover { background: var(--surface-hover); }
 
     header h1 {
-      font-size: 1.75rem;
+      font-size: 1.6rem;
       font-weight: 700;
       letter-spacing: -0.02em;
     }
@@ -102,9 +114,15 @@
     .date-nav {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 16px;
-      margin-top: 12px;
+    }
+
+    @media (max-width: 640px) {
+      header { flex-direction: column; align-items: center; text-align: center; }
+      .header-left { align-items: center; }
+      .date-nav { justify-content: center; }
+      .header-right { justify-content: center; }
     }
 
     .date-nav button {
@@ -1046,15 +1064,19 @@
 <body>
   <div class="container">
     <header>
-      <h1>My Daily Performance Tracker</h1>
-      <div class="date-nav">
-        <button onclick="changeDate(-1)">&#8249;</button>
-        <span class="date-display" id="dateDisplay" onclick="openCalendar()" title="Pick a date"></span>
-        <button onclick="changeDate(1)">&#8250;</button>
-        <button onclick="openCalendar()" title="Pick a date">📅</button>
+      <div class="header-left">
+        <h1>My Daily Performance Tracker</h1>
+        <div class="date-nav">
+          <button onclick="changeDate(-1)">&#8249;</button>
+          <span class="date-display" id="dateDisplay" onclick="openCalendar()" title="Pick a date"></span>
+          <button onclick="changeDate(1)">&#8250;</button>
+          <button onclick="openCalendar()" title="Pick a date">📅</button>
+        </div>
       </div>
-      <div class="auth-bar" id="authBar"></div>
-      <div><button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓 Auto</button></div>
+      <div class="header-right">
+        <div class="auth-bar" id="authBar"></div>
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓 Auto</button>
+      </div>
     </header>
 
     <!-- Exercise Counters -->
