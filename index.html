@@ -509,6 +509,28 @@
       border-radius: var(--radius);
       padding: 20px;
     }
+    .work-start-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+    .work-start-row input[type="time"] {
+      width: auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 0.85rem;
+      outline: none;
+      color-scheme: dark;
+    }
+    body.light .work-start-row input[type="time"] { color-scheme: light; }
+    .work-start-row input[type="time"]:focus { border-color: var(--accent); }
 
     .timer-display {
       text-align: center;
@@ -1096,6 +1118,10 @@
     <div class="section">
       <div class="section-title">Work Timer</div>
       <div class="timer-card">
+        <div class="work-start-row">
+          <span>🕘 Started work at</span>
+          <input type="time" id="workStartIn" onchange="setWorkStart(this.value)">
+        </div>
         <div class="timer-display">
           <div class="timer-time" id="timerDisplay">30:00</div>
           <div class="progress-bar">
@@ -1692,6 +1718,7 @@
       currentDate = new Date();
       render();
     }
+    function setWorkStart(value) { saveField('work_start', value); } // per-day "started work at" time
 
     // ---- Calendar picker (green = has data, faded = none) ----
     let calMonth = null; // Date on the 1st of the displayed month
@@ -2901,7 +2928,7 @@
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
+        'work_start', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
       ];
       const lines = [cols.join(',')];
       rows.forEach(r => {
@@ -2926,7 +2953,7 @@
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
-          d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
+          d.work_start || '', d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
           sumVal(d.meditation), sumVal(d.reading), weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
@@ -3024,6 +3051,8 @@
       renderMind();
       refreshTimerUI();
       updateSoundBtn();
+      const wsEl = document.getElementById('workStartIn');
+      if (wsEl) wsEl.value = getField('work_start', '');
     }
 
     // ---- Theme: 3-way toggle — Auto (follow OS) → Light → Dark ----
