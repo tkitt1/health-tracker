@@ -1341,6 +1341,9 @@
       return !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
     }
 
+    // Device-local preferences — never synced (theme follows each device's OS; sound is per-device).
+    const LOCAL_ONLY_KEYS = ['ht_meta', 'ht_theme', 'ht_sound'];
+
     function metaGet() { try { return JSON.parse(localStorage.getItem('ht_meta') || '{}'); } catch (e) { return {}; } }
     function metaSet(m) { localStorage.setItem('ht_meta', JSON.stringify(m)); }
 
@@ -1352,7 +1355,7 @@
     }
 
     async function pushKey(key, value, ts) {
-      if (!sb || !currentUser) return;
+      if (!sb || !currentUser || LOCAL_ONLY_KEYS.includes(key)) return;
       try {
         await sb.from('tracker_data').upsert(
           { user_id: currentUser.id, key, value, updated_at: new Date(ts || Date.now()).toISOString() },
@@ -1374,11 +1377,12 @@
       const remote = {};
       data.forEach(r => remote[r.key] = { value: r.value, ts: new Date(r.updated_at).getTime() });
       const m = metaGet();
-      const localKeys = Object.keys(localStorage).filter(k => k.startsWith('ht_') && k !== 'ht_meta');
+      const localKeys = Object.keys(localStorage).filter(k => k.startsWith('ht_') && !LOCAL_ONLY_KEYS.includes(k));
       const allKeys = new Set([...Object.keys(remote), ...localKeys]);
       const toPush = [];
       let pulledChange = false;
       allKeys.forEach(k => {
+        if (LOCAL_ONLY_KEYS.includes(k)) return; // device-local prefs: never pull or push
         const r = remote[k];
         const lv = localStorage.getItem(k);
         const lts = m[k] || 0;
