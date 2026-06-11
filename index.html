@@ -1059,10 +1059,20 @@
       <div class="card-grid" id="exerciseGrid"></div>
     </div>
 
-    <!-- Measurements -->
+    <!-- Workout Ideas -->
     <div class="section">
-      <div class="section-title">Measurements</div>
-      <div class="card-grid" id="measuresGrid"></div>
+      <div class="section-title">Workout Ideas</div>
+      <div class="workout-card">
+        <div class="workout-controls">
+          <button class="add-btn workout-btn" onclick="randomWorkout()">🎲 Random Workout</button>
+        </div>
+        <div class="workout-suggestion" id="workoutSuggestion" style="display:none">
+          <span id="workoutText"></span>
+          <button class="view-link" onclick="logWorkout()">＋ add to notes</button>
+        </div>
+        <textarea id="workoutNotes" class="workout-notes" placeholder="Workout notes for the day…"
+          onchange="saveField('workout_notes', this.value)"></textarea>
+      </div>
     </div>
 
     <!-- Cardio -->
@@ -1114,6 +1124,11 @@
       <div id="intakeSection"></div>
     </div>
 
+    <!-- Measurements -->
+    <div class="section">
+      <div class="section-title">Measurements</div>
+      <div class="card-grid" id="measuresGrid"></div>
+    </div>
 
     <!-- Intermittent Fasting -->
     <div class="section">
@@ -1125,22 +1140,6 @@
     <div class="section">
       <div class="section-title">Mind</div>
       <div class="mind-grid" id="mindGrid"></div>
-    </div>
-
-    <!-- Workout Ideas -->
-    <div class="section">
-      <div class="section-title">Workout Ideas</div>
-      <div class="workout-card">
-        <div class="workout-controls">
-          <button class="add-btn workout-btn" onclick="randomWorkout()">🎲 Random Workout</button>
-        </div>
-        <div class="workout-suggestion" id="workoutSuggestion" style="display:none">
-          <span id="workoutText"></span>
-          <button class="view-link" onclick="logWorkout()">＋ add to notes</button>
-        </div>
-        <textarea id="workoutNotes" class="workout-notes" placeholder="Workout notes for the day…"
-          onchange="saveField('workout_notes', this.value)"></textarea>
-      </div>
     </div>
 
     <!-- History -->
