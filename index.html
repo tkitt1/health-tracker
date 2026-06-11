@@ -1478,10 +1478,7 @@
       if (!el) return;
       if (!syncConfigured()) { el.innerHTML = '<span class="auth-note">Cloud sync not set up</span>'; return; }
       if (currentUser) {
-        const passkeyLink = (passkeysAvailable() && !hasPasskey())
-          ? `<button class="auth-link" onclick="doRegisterPasskey()">Add passkey</button>` : '';
         el.innerHTML = `<span class="auth-note">☁ Synced</span>
-          ${passkeyLink}
           <button class="auth-link" onclick="doSignOut()">Sign out</button>`;
       } else {
         el.innerHTML = `<button class="auth-link" onclick="openAuth()">☁ Sign in to sync</button>`;
