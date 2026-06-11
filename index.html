@@ -141,12 +141,13 @@
 
     .date-nav .date-display {
       font-size: 1rem;
-      color: var(--text-muted);
+      font-weight: 600;
+      color: var(--accent);
       min-width: 110px;
       text-align: center;
       cursor: pointer;
     }
-    .date-nav .date-display:hover { color: var(--text); }
+    .date-nav .date-display:hover { text-decoration: underline; }
 
     .section {
       margin-bottom: 24px;
@@ -1507,6 +1508,8 @@
       try {
         const { error } = await sb.auth.signInWithPasskey();
         if (error) { msg.textContent = error.message; return; }
+        persist('ht_passkey_added', '1'); // signed in with a passkey -> you clearly have one
+        updateAuthBar();
         closeAuth();
       } catch (e) { msg.textContent = 'Passkey sign-in was cancelled.'; }
     }
