@@ -2981,14 +2981,21 @@
 
     applyTheme();
     render();
-    updateTimerLive(true); // reconcile work-timer state on load (no sound for missed transitions)
 
-    // Keep the fasting + work timers ticking live
+    // IF ticker is UI-only (no writes) — safe to start immediately.
     setInterval(updateIFLive, 1000);
-    setInterval(updateTimerLive, 1000);
 
-    // Initialise cloud sync (no-op until SUPABASE_URL/KEY are filled in)
-    initSync();
+    // IMPORTANT: pull from the cloud BEFORE the work-timer does its first reconcile/write,
+    // otherwise a freshly-signed-in device can overwrite the cloud with its stale local data.
+    let timersStarted = false;
+    function startWorkTimer() {
+      if (timersStarted) return;
+      timersStarted = true;
+      updateTimerLive(true); // reconcile work-timer state (now using freshly-synced data)
+      setInterval(updateTimerLive, 1000);
+    }
+    initSync().finally(startWorkTimer);
+    setTimeout(startWorkTimer, 4000); // fallback if sync is slow/offline
   </script>
 </body>
 </html>
