@@ -1373,11 +1373,13 @@
       const localKeys = Object.keys(localStorage).filter(k => k.startsWith('ht_') && k !== 'ht_meta');
       const allKeys = new Set([...Object.keys(remote), ...localKeys]);
       const toPush = [];
+      let pulledChange = false;
       allKeys.forEach(k => {
         const r = remote[k];
         const lv = localStorage.getItem(k);
         const lts = m[k] || 0;
         if (r && (lv == null || r.ts >= lts)) {
+          if (localStorage.getItem(k) !== r.value) pulledChange = true;
           localStorage.setItem(k, r.value);   // remote is newer
           m[k] = r.ts;
         } else if (lv != null && (!r || lts > r.ts)) {
@@ -1387,26 +1389,53 @@
       });
       metaSet(m);
       if (toPush.length) { try { await sb.from('tracker_data').upsert(toPush, { onConflict: 'user_id,key' }); } catch (e) {} }
-      render();
+      if (pulledChange) render(); // only re-render when remote actually brought new data
+    }
+
+    let lastKeepAlive = 0;
+    // Refresh the session (so it doesn't appear "logged off" on mobile) and pull latest.
+    async function keepAliveAndSync(force) {
+      if (!sb) return;
+      const now = Date.now();
+      if (!force && now - lastKeepAlive < 4000) return; // throttle bursts
+      lastKeepAlive = now;
+      try {
+        // getSession() auto-refreshes an expired access token if the refresh token is still valid.
+        const { data } = await sb.auth.getSession();
+        currentUser = (data && data.session) ? data.session.user : currentUser;
+        if (!(data && data.session)) currentUser = null;
+      } catch (e) { /* keep existing currentUser on transient errors */ }
+      updateAuthBar();
+      if (currentUser) await syncOnLogin();
     }
 
     async function initSync() {
       updateAuthBar();
       if (!syncConfigured()) return;
-      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
       try {
         const { data } = await sb.auth.getSession();
         currentUser = data.session ? data.session.user : null;
       } catch (e) { currentUser = null; }
       updateAuthBar();
       if (currentUser) await syncOnLogin();
-      sb.auth.onAuthStateChange((_e, session) => {
+
+      sb.auth.onAuthStateChange((event, session) => {
         currentUser = session ? session.user : null;
         updateAuthBar();
-        if (currentUser) syncOnLogin();
+        if (currentUser && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+          syncOnLogin();
+        }
       });
-      // Pull latest when returning to the tab (cheap cross-device refresh)
-      window.addEventListener('focus', () => { if (currentUser) syncOnLogin(); });
+
+      // Mobile Safari often fires visibilitychange (not focus) when returning to the app.
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAliveAndSync(true); });
+      window.addEventListener('focus', () => keepAliveAndSync(true));
+      window.addEventListener('online', () => keepAliveAndSync(true));
+      // Periodic keep-alive + pull while the app is open and visible.
+      setInterval(() => { if (document.visibilityState === 'visible') keepAliveAndSync(); }, 45000);
     }
 
     // ---- Auth UI ----
