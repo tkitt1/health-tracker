@@ -32,7 +32,7 @@ const HEADERS = [
   'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
   'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
   'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
-  'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure'
+  'weight_kg', 'vo2max', 'hrv_ms', 'resting_hr', 'sleep_score', 'body_fat_pct', 'blood_pressure', 'mood'
 ];
 
 function appendDailyTotals() {
@@ -86,7 +86,11 @@ function writeRow_(dateKey, d) {
     (Array.isArray(d.weight) && d.weight.length) ? d.weight[d.weight.length - 1].v : '',
     (Array.isArray(d.vo2max) && d.vo2max.length) ? d.vo2max[d.vo2max.length - 1].v : '',
     (Array.isArray(d.hrv) && d.hrv.length) ? d.hrv[d.hrv.length - 1].v : '',
-    (Array.isArray(d.bp) && d.bp.length) ? (d.bp[d.bp.length - 1].sys + '/' + d.bp[d.bp.length - 1].dia) : ''
+    (Array.isArray(d.restinghr) && d.restinghr.length) ? d.restinghr[d.restinghr.length - 1].v : '',
+    (Array.isArray(d.sleep) && d.sleep.length) ? d.sleep[d.sleep.length - 1].v : '',
+    (Array.isArray(d.bodyfat) && d.bodyfat.length) ? d.bodyfat[d.bodyfat.length - 1].v : '',
+    (Array.isArray(d.bp) && d.bp.length) ? (d.bp[d.bp.length - 1].sys + '/' + d.bp[d.bp.length - 1].dia) : '',
+    d.mood || ''
   ];
 
   // Update today's row if it already exists, otherwise append.

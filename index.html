@@ -872,6 +872,30 @@
     }
     .journal-open-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+    .mood-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .mood-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.85rem;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      transition: border-color .15s, background .15s;
+    }
+    .mood-option input { display: none; }
+    .mood-option .mood-emoji { font-size: 1.15rem; line-height: 1; }
+    .mood-option.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+
     .mind-card .card-header {
       margin-bottom: 8px;
     }
@@ -1327,6 +1351,9 @@
       { key: 'weight', label: 'Weight', icon: '⚖️' },
       { key: 'vo2max', label: 'VO2max', icon: '🫁' },
       { key: 'hrv', label: 'HRV', icon: '💓' },
+      { key: 'restinghr', label: 'Resting HR', icon: '❤️' },
+      { key: 'sleep', label: 'Sleep Score', icon: '😴' },
+      { key: 'bodyfat', label: 'Body Fat', icon: '📊' },
       { key: 'bp', label: 'Blood Pressure', icon: '🩸' },
     ];
 
@@ -2261,6 +2288,9 @@
       { key: 'weight', label: 'Weight', icon: '⚖️', unit: 'kg', step: '0.1' },
       { key: 'vo2max', label: 'VO2max', icon: '🫁', unit: 'ml/kg/min', step: '0.1' },
       { key: 'hrv', label: 'HRV', icon: '💓', unit: 'ms', step: '1' },
+      { key: 'restinghr', label: 'Resting HR', icon: '❤️', unit: 'bpm', step: '1' },
+      { key: 'sleep', label: 'Sleep Score', icon: '😴', unit: 'score', step: '1' },
+      { key: 'bodyfat', label: 'Body Fat', icon: '📊', unit: '%', step: '0.1' },
     ];
 
     function asOfMeta(last) {
@@ -2308,7 +2338,37 @@
             <button class="add-btn" onclick="addBP()">Add</button>
           </div>
         </div>`;
+
+      const mood = getField('mood', '');
+      const MOODS = [
+        { v: 'happy', label: 'Happy', icon: '😊' },
+        { v: 'stressed', label: 'Stressed', icon: '😰' },
+        { v: 'angry', label: 'Angry', icon: '😠' },
+        { v: 'sad', label: 'Sad', icon: '😢' },
+      ];
+      html += `
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">🧠</span>
+            <span class="card-label">Mood</span>
+          </div>
+          <div class="mood-options">
+            ${MOODS.map(o => `
+              <label class="mood-option${mood === o.v ? ' selected' : ''}">
+                <input type="radio" name="mood" value="${o.v}"${mood === o.v ? ' checked' : ''} onchange="setMood('${o.v}')">
+                <span class="mood-emoji">${o.icon}</span>
+                <span class="mood-text">${o.label}</span>
+              </label>`).join('')}
+          </div>
+        </div>`;
       section.innerHTML = html;
+    }
+
+    function setMood(v) {
+      // Tap the selected mood again to clear it.
+      const current = getField('mood', '');
+      saveField('mood', current === v ? '' : v);
+      renderMeasures();
     }
 
     function addBP() {
@@ -2985,7 +3045,8 @@
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
+        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
+        'weight_kg', 'vo2max', 'hrv_ms', 'resting_hr', 'sleep_score', 'body_fat_pct', 'blood_pressure', 'mood', 'workout_notes'
       ];
       const lines = [cols.join(',')];
       rows.forEach(r => {
@@ -3000,6 +3061,9 @@
         const weightLast = lastV(d.weight);
         const vo2Last = lastV(d.vo2max);
         const hrvLast = lastV(d.hrv);
+        const restingLast = lastV(d.restinghr);
+        const sleepLast = lastV(d.sleep);
+        const bodyfatLast = lastV(d.bodyfat);
         const bpArr = d.bp;
         const bpLast = (Array.isArray(bpArr) && bpArr.length) ? `${bpArr[bpArr.length - 1].sys || 0}/${bpArr[bpArr.length - 1].dia || 0}` : '';
         const vals = [
@@ -3011,7 +3075,8 @@
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
-          sumVal(d.meditation), sumVal(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '', weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
+          sumVal(d.meditation), sumVal(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '',
+          weightLast, vo2Last, hrvLast, restingLast, sleepLast, bodyfatLast, bpLast, d.mood || '', d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
       });
