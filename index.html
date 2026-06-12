@@ -872,9 +872,17 @@
     }
     .journal-open-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+    .mood-card-full { grid-column: 1 / -1; }
+    .mood-last {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .mood-options {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: 8px;
       margin-top: 4px;
       width: 100%;
@@ -889,15 +897,17 @@
       border-radius: 8px;
       padding: 10px;
       font-size: 0.85rem;
+      font-family: inherit;
+      text-align: left;
       color: var(--text);
       cursor: pointer;
       user-select: none;
-      transition: border-color .15s, background .15s;
+      transition: border-color .15s, background .15s, transform .05s;
     }
-    .mood-option input { display: none; }
+    .mood-option:hover { border-color: var(--accent); }
+    .mood-option:active { transform: scale(0.97); }
     .mood-option .mood-emoji { font-size: 1.15rem; line-height: 1; flex: none; }
     .mood-option .mood-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .mood-option.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 
     .mind-card .card-header {
       margin-bottom: 8px;
@@ -1358,7 +1368,17 @@
       { key: 'sleep', label: 'Sleep Score', icon: '😴' },
       { key: 'bodyfat', label: 'Body Fat', icon: '📊' },
       { key: 'bp', label: 'Blood Pressure', icon: '🩸' },
+      { key: 'mood', label: 'Mood', icon: '🧠' },
     ];
+
+    // Mood is a timestamped log (like other entries): each tap records v=mood.
+    const MOOD_OPTIONS = [
+      { v: 'happy', label: 'Happy', icon: '😊' },
+      { v: 'stressed', label: 'Stressed', icon: '😰' },
+      { v: 'angry', label: 'Angry', icon: '😠' },
+      { v: 'sad', label: 'Sad', icon: '😢' },
+    ];
+    const moodMeta = v => MOOD_OPTIONS.find(o => o.v === v) || { v, label: v, icon: '🧠' };
 
     const CARDIO = [
       { key: 'bike', label: 'Bike', icon: '🚴', distUnit: 'km', distStep: '0.1', speedUnit: 'km/h' },
@@ -2342,36 +2362,36 @@
           </div>
         </div>`;
 
-      const mood = getField('mood', '');
-      const MOODS = [
-        { v: 'happy', label: 'Happy', icon: '😊' },
-        { v: 'stressed', label: 'Stressed', icon: '😰' },
-        { v: 'angry', label: 'Angry', icon: '😠' },
-        { v: 'sad', label: 'Sad', icon: '😢' },
-      ];
+      const moodArr = getEntries('mood');
+      const lastMood = moodArr[moodArr.length - 1];
+      const lastTxt = lastMood
+        ? `${moodMeta(lastMood.v).icon} ${moodMeta(lastMood.v).label} · ${new Date(lastMood.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+        : '';
       html += `
-        <div class="card">
+        <div class="card mood-card-full">
           <div class="card-header">
             <span class="card-icon">🧠</span>
             <span class="card-label">Mood</span>
+            ${lastMood ? `<span class="mood-last">${lastTxt}</span>` : ''}
+            <span class="view-link" onclick="openEntries('mood','mood')">edit${moodArr.length ? ` (${moodArr.length})` : ''}</span>
           </div>
           <div class="mood-options">
-            ${MOODS.map(o => `
-              <label class="mood-option${mood === o.v ? ' selected' : ''}">
-                <input type="radio" name="mood" value="${o.v}"${mood === o.v ? ' checked' : ''} onchange="setMood('${o.v}')">
+            ${MOOD_OPTIONS.map(o => `
+              <button type="button" class="mood-option" onclick="logMood('${o.v}')">
                 <span class="mood-emoji">${o.icon}</span>
                 <span class="mood-text">${o.label}</span>
-              </label>`).join('')}
+              </button>`).join('')}
           </div>
         </div>`;
       section.innerHTML = html;
     }
 
-    function setMood(v) {
-      // Tap the selected mood again to clear it.
-      const current = getField('mood', '');
-      saveField('mood', current === v ? '' : v);
-      renderMeasures();
+    // Record the moment's mood as a timestamped entry (accumulates; never "stuck").
+    function logMood(v) {
+      const arr = getEntries('mood');
+      arr.push({ id: genId(), t: Date.now(), v });
+      setEntries('mood', arr);
+      render();
     }
 
     function addBP() {
@@ -2438,6 +2458,15 @@
               onchange="updateEntry('${e.id}','sys',this.value)"><span class="entry-u">sys</span>
             <input type="number" min="0" class="entry-input" value="${e.dia || 0}"
               onchange="updateEntry('${e.id}','dia',this.value)"><span class="entry-u">dia</span>
+            <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
+          </div>`;
+        }
+        if (modalType === 'mood') {
+          return `<div class="entry-row">
+            <span class="entry-time">${t}</span>
+            <select class="entry-var-select" onchange="updateEntryText('${e.id}','v',this.value)">
+              ${MOOD_OPTIONS.map(o => `<option value="${o.v}"${e.v === o.v ? ' selected' : ''}>${o.icon} ${o.label}</option>`).join('')}
+            </select>
             <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
           </div>`;
         }
@@ -3079,7 +3108,8 @@
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
           sumVal(d.meditation), sumVal(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '',
-          weightLast, vo2Last, hrvLast, restingLast, sleepLast, bodyfatLast, bpLast, d.mood || '', d.workout_notes || ''
+          weightLast, vo2Last, hrvLast, restingLast, sleepLast, bodyfatLast, bpLast,
+          (Array.isArray(d.mood) && d.mood.length) ? d.mood[d.mood.length - 1].v : '', d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
       });

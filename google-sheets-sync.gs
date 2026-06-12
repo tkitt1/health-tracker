@@ -90,7 +90,7 @@ function writeRow_(dateKey, d) {
     (Array.isArray(d.sleep) && d.sleep.length) ? d.sleep[d.sleep.length - 1].v : '',
     (Array.isArray(d.bodyfat) && d.bodyfat.length) ? d.bodyfat[d.bodyfat.length - 1].v : '',
     (Array.isArray(d.bp) && d.bp.length) ? (d.bp[d.bp.length - 1].sys + '/' + d.bp[d.bp.length - 1].dia) : '',
-    d.mood || ''
+    (Array.isArray(d.mood) && d.mood.length) ? d.mood[d.mood.length - 1].v : ''
   ];
 
   // Update today's row if it already exists, otherwise append.
