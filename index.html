@@ -837,22 +837,26 @@
       border-radius: var(--radius);
       padding: 16px;
     }
-    .journal-notes {
-      width: 100%;
-      min-height: 78px;
+    .journal-checks {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
       margin-top: 4px;
+    }
+    .journal-check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       background: var(--bg);
       border: 1px solid var(--border);
-      color: var(--text);
       border-radius: 8px;
-      padding: 10px;
-      font-size: 0.85rem;
-      font-family: inherit;
-      line-height: 1.5;
-      resize: vertical;
-      outline: none;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
     }
-    .journal-notes:focus { border-color: var(--accent); }
+    .journal-check input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
     .journal-open-btn {
       margin-top: 8px;
       width: 100%;
@@ -2233,12 +2237,22 @@
             <span class="card-icon">📓</span>
             <span class="card-label">Journal</span>
           </div>
-          <textarea id="journalNotes" class="journal-notes" placeholder="Today's journal…"
-            onchange="saveField('journal', this.value)"></textarea>
+          <div class="journal-checks">
+            <label class="journal-check">
+              <input type="checkbox" id="journalAm" onchange="saveField('journal_am', this.checked)">
+              <span>☀️ AM journal</span>
+            </label>
+            <label class="journal-check">
+              <input type="checkbox" id="journalPm" onchange="saveField('journal_pm', this.checked)">
+              <span>🌙 PM journal</span>
+            </label>
+          </div>
           <button class="journal-open-btn" onclick="openJournalApp()" title="Open Apple Journal (iPhone/iPad, or Mac if installed)">📓 Open Journal app</button>
         </div>`;
-      const jEl = document.getElementById('journalNotes');
-      if (jEl) jEl.value = getField('journal', '');
+      const amEl = document.getElementById('journalAm');
+      const pmEl = document.getElementById('journalPm');
+      if (amEl) amEl.checked = !!getField('journal_am', false);
+      if (pmEl) pmEl.checked = !!getField('journal_pm', false);
     }
 
     // ---- Body measurements (show latest reading) ----
@@ -2971,7 +2985,7 @@
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
+        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
       ];
       const lines = [cols.join(',')];
       rows.forEach(r => {
@@ -2997,7 +3011,7 @@
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
-          sumVal(d.meditation), sumVal(d.reading), d.journal || '', weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
+          sumVal(d.meditation), sumVal(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '', weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
       });
