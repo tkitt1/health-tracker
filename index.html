@@ -601,7 +601,8 @@
     .timer-stats {
       display: flex;
       justify-content: center;
-      gap: 24px;
+      flex-wrap: wrap;
+      gap: 16px 24px;
     }
 
     .timer-stat {
@@ -1196,6 +1197,10 @@
             <div class="timer-stat-label">Started</div>
           </div>
           <div class="timer-stat">
+            <div class="timer-stat-value" id="workEndStat">—</div>
+            <div class="timer-stat-label">Ended</div>
+          </div>
+          <div class="timer-stat">
             <div class="timer-stat-value" id="workPeriods">0</div>
             <div class="timer-stat-label">Work Periods</div>
           </div>
@@ -1780,6 +1785,20 @@
       const data = getData();
       data[field] = value;
       saveData(data);
+    }
+
+    // Read/write a field on TODAY's record specifically (not the date being viewed).
+    // Used by the work timer so Started/Ended always belong to the real current day.
+    function getTodayField(field, fallback) {
+      const key = 'ht_' + dateKey(new Date());
+      let d = {}; try { d = JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) {}
+      return d[field] !== undefined ? d[field] : fallback;
+    }
+    function setTodayField(field, value) {
+      const key = 'ht_' + dateKey(new Date());
+      let d = {}; try { d = JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) {}
+      d[field] = value;
+      persist(key, JSON.stringify(d));
     }
 
     // Open the Apple Journal app. Apple exposes no public scheme to create a
@@ -2748,13 +2767,20 @@
         progressEl.className = 'progress-fill ' + cls;
         progressEl.style.width = ((total - remaining) / total * 100) + '%';
       }
-      // "Started" stat — when work began today (fallback: estimate from the first logged period)
-      let startMs = t.dayStartedAt || 0;
+      // "Started"/"Ended" stats — first Start and End-Day times for the real current day.
+      // Stored on today's record so they never drift on pause/resume. Legacy fallbacks:
+      // old dayStartedAt, or estimate from the first logged period.
+      const fmtClock = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      let startMs = getTodayField('work_started_at', 0);
       if (!startMs && Array.isArray(t.periodLog) && t.periodLog.length && t.periodLog[0].t) {
-        startMs = t.periodLog[0].t - WORK_DURATION * 1000;
+        startMs = t.periodLog[0].t - WORK_DURATION * 1000; // estimate from first logged period
       }
+      if (!startMs) startMs = t.dayStartedAt || 0; // last resort: legacy field
+      const endMs = getTodayField('work_ended_at', 0);
       const wsEl = document.getElementById('workStartStat');
-      if (wsEl) wsEl.textContent = (startMs && t.started) ? new Date(startMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+      if (wsEl) wsEl.textContent = startMs ? fmtClock(startMs) : '—';
+      const weEl = document.getElementById('workEndStat');
+      if (weEl) weEl.textContent = endMs ? fmtClock(endMs) : '—';
 
       const wpEl = document.getElementById('workPeriods'); if (wpEl) wpEl.textContent = t.periods || 0;
       const liveWork = (t.workSeconds || 0) + (t.phase === 'work' ? (total - remaining) : 0);
@@ -2774,7 +2800,10 @@
       if (t.running) return;
       initAudio(); // unlock audio on the user's gesture
       if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.endedPeriods = 0; t.dayStartedAt = 0; }
-      if (!t.dayStartedAt) t.dayStartedAt = Date.now(); // first Start of the day = work start time
+      // Work start time = the FIRST Start of the day; stored on today's record so it
+      // survives pause/resume, timer resets, and cloud sync. Never overwritten.
+      if (!getTodayField('work_started_at', 0)) setTodayField('work_started_at', Date.now());
+      setTodayField('work_ended_at', 0); // resuming work clears any earlier End-Day stamp
       const rem = (t.started && t.remaining != null) ? t.remaining : phaseDur(t.phase);
       t.running = true; t.started = true; t.dayEnded = false; t.endsAt = Date.now() + rem * 1000;
       saveTimer(t); refreshTimerUI(t);
@@ -2816,6 +2845,7 @@
       const finalPeriods = t.periods || 0;
       const mins = Math.floor((t.workSeconds || 0) / 60);
       if (!confirm(`End your work day?\nRecorded for today: ${finalPeriods} work period(s), ${mins} min.`)) return;
+      setTodayField('work_ended_at', Date.now()); // work end time = when the day was ended
       mirrorDailyStats(t); // lock today's total into the per-day record (for the Report/History)
       // Reset the live counter to zero for the next day; keep the recorded total above.
       t.periods = 0; t.workSeconds = 0; t.periodLog = [];
@@ -3088,7 +3118,7 @@
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items', 'carbs_g', 'calories',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
+        'work_periods', 'work_minutes', 'work_start', 'work_end', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
         'weight_kg', 'vo2max', 'hrv_ms', 'resting_hr', 'sleep_score', 'body_fat_pct', 'blood_pressure', 'mood', 'workout_notes'
       ];
       const lines = [cols.join(',')];
@@ -3118,6 +3148,8 @@
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems, sumVal(d.carbs), sumVal(d.calories),
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
+          d.work_started_at ? new Date(d.work_started_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
+          d.work_ended_at ? new Date(d.work_ended_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
           sumVal(d.meditation), sumVal(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '',
           weightLast, vo2Last, hrvLast, restingLast, sleepLast, bodyfatLast, bpLast,
           (Array.isArray(d.mood) && d.mood.length) ? d.mood[d.mood.length - 1].v : '', d.workout_notes || ''

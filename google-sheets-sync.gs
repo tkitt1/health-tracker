@@ -31,7 +31,7 @@ const SHEET_NAME = 'Daily Tracker';
 const HEADERS = [
   'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
   'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
-  'coffee', 'creatine', 'protein', 'carbs', 'calories', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
+  'coffee', 'creatine', 'protein', 'carbs', 'calories', 'work_periods', 'work_minutes', 'work_start', 'work_end', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
   'weight_kg', 'vo2max', 'hrv_ms', 'resting_hr', 'sleep_score', 'body_fat_pct', 'blood_pressure', 'mood'
 ];
 
@@ -82,6 +82,8 @@ function writeRow_(dateKey, d) {
     sum_(d.coffee), sum_(d.creatine), sum_(d.protein), sum_(d.carbs), sum_(d.calories),
     Number(d.timer_periods) || 0,
     Math.floor((Number(d.timer_total_work) || 0) / 60),
+    d.work_started_at ? Utilities.formatDate(new Date(d.work_started_at), Session.getScriptTimeZone(), 'h:mm a') : '',
+    d.work_ended_at ? Utilities.formatDate(new Date(d.work_ended_at), Session.getScriptTimeZone(), 'h:mm a') : '',
     sum_(d.meditation), sum_(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '',
     (Array.isArray(d.weight) && d.weight.length) ? d.weight[d.weight.length - 1].v : '',
     (Array.isArray(d.vo2max) && d.vo2max.length) ? d.vo2max[d.vo2max.length - 1].v : '',
