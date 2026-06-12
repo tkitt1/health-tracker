@@ -1129,6 +1129,10 @@
         </div>
         <div class="timer-stats">
           <div class="timer-stat">
+            <div class="timer-stat-value" id="workStartStat">—</div>
+            <div class="timer-stat-label">Started</div>
+          </div>
+          <div class="timer-stat">
             <div class="timer-stat-value" id="workPeriods">0</div>
             <div class="timer-stat-label">Work Periods</div>
           </div>
@@ -2531,7 +2535,7 @@
       let t = getTimer();
       let changed = false;
       const today = dateKey(new Date());
-      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.dayEnded = false; t.endedPeriods = 0; t.warned5 = false; changed = true; }
+      if (t.day !== today) { t.day = today; t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.dayEnded = false; t.endedPeriods = 0; t.warned5 = false; t.dayStartedAt = 0; changed = true; }
       // Self-heal a corrupt/runaway count (>40 periods in a day is physically impossible).
       if ((t.periods || 0) > 40 || (Array.isArray(t.periodLog) && t.periodLog.length > 40)) {
         t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.running = false; t.endsAt = 0; changed = true;
@@ -2596,6 +2600,14 @@
         progressEl.className = 'progress-fill ' + cls;
         progressEl.style.width = ((total - remaining) / total * 100) + '%';
       }
+      // "Started" stat — when work began today (fallback: estimate from the first logged period)
+      let startMs = t.dayStartedAt || 0;
+      if (!startMs && Array.isArray(t.periodLog) && t.periodLog.length && t.periodLog[0].t) {
+        startMs = t.periodLog[0].t - WORK_DURATION * 1000;
+      }
+      const wsEl = document.getElementById('workStartStat');
+      if (wsEl) wsEl.textContent = (startMs && t.started) ? new Date(startMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+
       const wpEl = document.getElementById('workPeriods'); if (wpEl) wpEl.textContent = t.periods || 0;
       const liveWork = (t.workSeconds || 0) + (t.phase === 'work' ? (total - remaining) : 0);
       const twEl = document.getElementById('totalWorkTime'); if (twEl) twEl.textContent = Math.floor(liveWork / 60) + 'm';
@@ -2613,7 +2625,8 @@
       const t = getTimer();
       if (t.running) return;
       initAudio(); // unlock audio on the user's gesture
-      if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.endedPeriods = 0; }
+      if (t.day !== dateKey(new Date())) { t.day = dateKey(new Date()); t.periods = 0; t.workSeconds = 0; t.periodLog = []; t.endedPeriods = 0; t.dayStartedAt = 0; }
+      if (!t.dayStartedAt) t.dayStartedAt = Date.now(); // first Start of the day = work start time
       const rem = (t.started && t.remaining != null) ? t.remaining : phaseDur(t.phase);
       t.running = true; t.started = true; t.dayEnded = false; t.endsAt = Date.now() + rem * 1000;
       saveTimer(t); refreshTimerUI(t);
@@ -2645,7 +2658,7 @@
 
     function resetTimer() {
       const t = getTimer();
-      t.phase = 'work'; t.running = false; t.started = false; t.remaining = WORK_DURATION; t.endsAt = 0; t.warned5 = false;
+      t.phase = 'work'; t.running = false; t.started = false; t.remaining = WORK_DURATION; t.endsAt = 0; t.warned5 = false; t.dayStartedAt = 0;
       saveTimer(t); refreshTimerUI(t);
     }
 
@@ -2659,7 +2672,7 @@
       // Reset the live counter to zero for the next day; keep the recorded total above.
       t.periods = 0; t.workSeconds = 0; t.periodLog = [];
       t.running = false; t.started = false; t.dayEnded = true; t.endedPeriods = finalPeriods;
-      t.phase = 'work'; t.remaining = WORK_DURATION; t.endsAt = 0;
+      t.phase = 'work'; t.remaining = WORK_DURATION; t.endsAt = 0; t.dayStartedAt = 0;
       persist('ht_timer', JSON.stringify(t)); // persist WITHOUT mirroring (0 would overwrite the locked total)
       refreshTimerUI(t);
     }
