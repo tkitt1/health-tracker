@@ -169,6 +169,13 @@
       gap: 12px;
     }
 
+    /* INTAKE: fixed 2-column grid (2×2…) */
+    .intake-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -1074,6 +1081,7 @@
 
     @media (max-width: 400px) {
       .card-grid { grid-template-columns: 1fr; }
+      .intake-grid { grid-template-columns: 1fr; }
     }
 
     /* Calendar picker */
@@ -1391,6 +1399,8 @@
       { key: 'coffee', label: 'Coffee', icon: '☕', unit: 'cups', showLast: true },
       { key: 'creatine', label: 'Creatine', icon: '💊', unit: 'g' },
       { key: 'protein', label: 'Protein', icon: '🥩', unit: 'g', withItem: true },
+      { key: 'carbs', label: 'Carbs', icon: '🍞', unit: 'g' },
+      { key: 'calories', label: 'Calories', icon: '🔥', unit: 'kcal' },
     ];
 
     const REPORT_ROWS = [
@@ -2001,41 +2011,42 @@
     // Intake (field entry)
     function renderIntake() {
       const section = document.getElementById('intakeSection');
-      section.innerHTML = INTAKE.map(item => {
+      const cards = INTAKE.map(item => {
         const entries = getEntries(item.key);
         const total = sumEntries(item.key);
         const n = entries.length;
         let lastMeta = '';
         if (item.showLast && n) {
           const lastT = entries[entries.length - 1].t;
-          if (lastT) lastMeta = `<span class="intake-sub">last ${new Date(lastT).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          if (lastT) lastMeta = `<div class="if-meta">last ${new Date(lastT).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               <span class="view-link" style="margin-left:6px" onclick="toggleLastEdit('${item.key}')">edit</span>
-            </span>
-            <span class="intake-lastedit" id="${item.key}_lastedit" style="display:none; width:100%; margin-top:6px">
+            </div>
+            <div class="intake-lastedit" id="${item.key}_lastedit" style="display:none; margin-top:6px">
               <input type="datetime-local" value="${toLocalInput(lastT)}" onchange="setLastTime('${item.key}', this.value)">
-            </span>`;
+            </div>`;
         }
         const itemField = item.withItem
           ? `<input type="text" class="protein-item-in" placeholder="what you ate" id="${item.key}_item_in"
                onkeydown="if(event.key==='Enter')addCount('${item.key}')">`
           : '';
         return `
-          <div class="intake-row">
-            <div class="intake-left">
+          <div class="card">
+            <div class="card-header">
               <span class="card-icon">${item.icon}</span>
-              <span class="intake-label">${item.label}</span>
-              <span class="intake-total"><span class="total-value">${total}</span> <span class="total-unit">${item.unit}</span></span>
-              ${lastMeta}
+              <span class="card-label">${item.label}</span>
+              <span class="view-link" onclick="openEntries('${item.key}','count')">edit${n ? ` (${n})` : ''}</span>
             </div>
-            <div class="add-row intake-add">
+            <div class="total-line"><span class="total-value">${total}</span><span class="total-unit">${item.unit}</span></div>
+            ${lastMeta}
+            <div class="add-row">
               <input type="number" min="0" placeholder="+ ${item.unit}" id="${item.key}_in"
                 onkeydown="if(event.key==='Enter')addCount('${item.key}')">
               ${itemField}
               <button class="add-btn" onclick="addCount('${item.key}')">Add</button>
-              <span class="view-link" onclick="openEntries('${item.key}','count')">edit${n ? ` (${n})` : ''}</span>
             </div>
           </div>`;
       }).join('');
+      section.innerHTML = `<div class="intake-grid">${cards}</div>`;
     }
 
     // IF
@@ -3076,7 +3087,7 @@
       const cols = [
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
-        'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
+        'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items', 'carbs_g', 'calories',
         'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
         'weight_kg', 'vo2max', 'hrv_ms', 'resting_hr', 'sleep_score', 'body_fat_pct', 'blood_pressure', 'mood', 'workout_notes'
       ];
@@ -3105,7 +3116,7 @@
           sumVal(d.run, 'time'), sumVal(d.run, 'dist'),
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
-          sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
+          sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems, sumVal(d.carbs), sumVal(d.calories),
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
           sumVal(d.meditation), sumVal(d.reading), d.journal_am ? 'yes' : '', d.journal_pm ? 'yes' : '',
           weightLast, vo2Last, hrvLast, restingLast, sleepLast, bodyfatLast, bpLast,
