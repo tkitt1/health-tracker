@@ -877,11 +877,13 @@
       grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-top: 4px;
+      width: 100%;
     }
     .mood-option {
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -893,7 +895,8 @@
       transition: border-color .15s, background .15s;
     }
     .mood-option input { display: none; }
-    .mood-option .mood-emoji { font-size: 1.15rem; line-height: 1; }
+    .mood-option .mood-emoji { font-size: 1.15rem; line-height: 1; flex: none; }
+    .mood-option .mood-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mood-option.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 
     .mind-card .card-header {
@@ -1340,7 +1343,7 @@
       { key: 'squats', label: 'Squats/Lunges', icon: '🦵' },
       { key: 'pullups', label: 'Pull Ups', icon: '🏋️' },
       { key: 'dips', label: 'Dips', icon: '🔻' },
-      { key: 'deadhang', label: 'Dead Hang', icon: '🧗', unit: 'sec' },
+      { key: 'deadhang', label: 'Dead Hang', icon: '💪', unit: 'sec' },
       { key: 'kettlebell', label: 'Kettle Bell Circuits', icon: '🔔', unit: 'rounds' },
       { key: 'sprints', label: 'Sprints', icon: '💨', unit: 'reps' },
       { key: 'jumprope', label: 'Jump Rope', icon: '🪢', unit: 'reps' },
