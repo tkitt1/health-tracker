@@ -853,6 +853,20 @@
       outline: none;
     }
     .journal-notes:focus { border-color: var(--accent); }
+    .journal-open-btn {
+      margin-top: 8px;
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .journal-open-btn:hover { border-color: var(--accent); color: var(--accent); }
 
     .mind-card .card-header {
       margin-bottom: 8px;
@@ -1704,6 +1718,22 @@
       saveData(data);
     }
 
+    // Open the Apple Journal app. Apple exposes no public scheme to create a
+    // prefilled entry, so this just launches the app (moments:// is Journal's
+    // internal URL scheme) — the user taps + to start writing. Works on
+    // iPhone/iPad (and Mac if Journal is installed); no-op on Windows/Android.
+    function openJournalApp() {
+      const ua = navigator.userAgent || '';
+      const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS desktop UA
+      if (!isApple) {
+        alert('Apple Journal is only available on iPhone, iPad, and recent Macs.');
+        return;
+      }
+      // Fire the scheme; if nothing handles it the page simply stays put.
+      window.location.href = 'moments://';
+    }
+
     function changeDate(offset) {
       currentDate.setDate(currentDate.getDate() + offset);
       render();
@@ -2205,6 +2235,7 @@
           </div>
           <textarea id="journalNotes" class="journal-notes" placeholder="Today's journal…"
             onchange="saveField('journal', this.value)"></textarea>
+          <button class="journal-open-btn" onclick="openJournalApp()" title="Open Apple Journal (iPhone/iPad, or Mac if installed)">📓 Open Journal app</button>
         </div>`;
       const jEl = document.getElementById('journalNotes');
       if (jEl) jEl.value = getField('journal', '');
