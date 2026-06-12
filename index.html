@@ -827,7 +827,7 @@
     /* Mind section */
     .mind-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 12px;
     }
 
@@ -837,6 +837,22 @@
       border-radius: var(--radius);
       padding: 16px;
     }
+    .journal-notes {
+      width: 100%;
+      min-height: 78px;
+      margin-top: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+    }
+    .journal-notes:focus { border-color: var(--accent); }
 
     .mind-card .card-header {
       margin-bottom: 8px;
@@ -2177,7 +2193,17 @@
               <button class="add-btn" onclick="addCount('${m.key}')">Add</button>
             </div>
           </div>`;
-      }).join('');
+      }).join('') + `
+        <div class="mind-card">
+          <div class="card-header">
+            <span class="card-icon">📓</span>
+            <span class="card-label">Journal</span>
+          </div>
+          <textarea id="journalNotes" class="journal-notes" placeholder="Today's journal…"
+            onchange="saveField('journal', this.value)"></textarea>
+        </div>`;
+      const jEl = document.getElementById('journalNotes');
+      if (jEl) jEl.value = getField('journal', '');
     }
 
     // ---- Body measurements (show latest reading) ----
@@ -2901,7 +2927,7 @@
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
         'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items',
-        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
+        'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal', 'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure', 'workout_notes'
       ];
       const lines = [cols.join(',')];
       rows.forEach(r => {
@@ -2927,7 +2953,7 @@
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems,
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
-          sumVal(d.meditation), sumVal(d.reading), weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
+          sumVal(d.meditation), sumVal(d.reading), d.journal || '', weightLast, vo2Last, hrvLast, bpLast, d.workout_notes || ''
         ];
         lines.push(vals.map(csvEscape).join(','));
       });

@@ -31,7 +31,7 @@ const SHEET_NAME = 'Daily Tracker';
 const HEADERS = [
   'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
   'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
-  'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min',
+  'coffee', 'creatine', 'protein', 'work_periods', 'work_minutes', 'meditation_min', 'reading_min', 'journal',
   'weight_kg', 'vo2max', 'hrv_ms', 'blood_pressure'
 ];
 
@@ -82,7 +82,7 @@ function writeRow_(dateKey, d) {
     sum_(d.coffee), sum_(d.creatine), sum_(d.protein),
     Number(d.timer_periods) || 0,
     Math.floor((Number(d.timer_total_work) || 0) / 60),
-    sum_(d.meditation), sum_(d.reading),
+    sum_(d.meditation), sum_(d.reading), d.journal || '',
     (Array.isArray(d.weight) && d.weight.length) ? d.weight[d.weight.length - 1].v : '',
     (Array.isArray(d.vo2max) && d.vo2max.length) ? d.vo2max[d.vo2max.length - 1].v : '',
     (Array.isArray(d.hrv) && d.hrv.length) ? d.hrv[d.hrv.length - 1].v : '',
