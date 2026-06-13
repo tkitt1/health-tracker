@@ -1877,6 +1877,16 @@
       return Math.round((parseFloat(n) || 0) * 100) / 100;
     }
 
+    // Cardio durations are stored as decimal minutes (back-compat with old data, CSV,
+    // and speed math) but entered and shown as MM:SS.
+    function minSecToMin(min, sec) {
+      return Math.round(((parseFloat(min) || 0) + (parseFloat(sec) || 0) / 60) * 10000) / 10000;
+    }
+    function fmtMMSS(mins) {
+      const total = Math.round((parseFloat(mins) || 0) * 60);
+      return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+
     function dateKey(d) {
       const dt = d || currentDate;
       return dt.getFullYear() + '-' +
@@ -2123,13 +2133,16 @@
               <span class="view-link" onclick="openEntries('${c.key}','cardio')">edit${n ? ` (${n})` : ''}</span>
             </div>
             <div class="total-line">
-              <span class="total-value">${time}</span><span class="total-unit">min</span>
+              <span class="total-value">${fmtMMSS(time)}</span><span class="total-unit">m:ss</span>
               <span class="total-sep">·</span>
               <span class="total-value">${dist}</span><span class="total-unit">${c.distUnit}</span>
             </div>
             ${speedLine}
             <div class="add-row">
-              <input type="number" min="0" placeholder="+ min" id="${c.key}_time_in">
+              <input type="number" min="0" placeholder="+ min" id="${c.key}_min_in">
+              <input type="number" min="0" max="59" placeholder="+ sec" id="${c.key}_sec_in">
+            </div>
+            <div class="add-row" style="margin-top:6px">
               <input type="number" min="0" step="${c.distStep}" placeholder="+ ${c.distUnit}" id="${c.key}_dist_in">
               <button class="add-btn" onclick="addCardio('${c.key}')">Add</button>
             </div>
@@ -2138,13 +2151,13 @@
     }
 
     function addCardio(key) {
-      const timeEl = document.getElementById(key + '_time_in');
-      const distEl = document.getElementById(key + '_dist_in');
-      const addTime = parseFloat(timeEl.value) || 0;
-      const addDist = parseFloat(distEl.value) || 0;
+      const addMin = parseFloat(document.getElementById(key + '_min_in').value) || 0;
+      const addSec = parseFloat(document.getElementById(key + '_sec_in').value) || 0;
+      const addDist = parseFloat(document.getElementById(key + '_dist_in').value) || 0;
+      const addTime = minSecToMin(addMin, addSec);
       if (addTime <= 0 && addDist <= 0) return;
       const arr = getEntries(key);
-      arr.push({ id: genId(), t: Date.now(), time: round(addTime), dist: round(addDist) });
+      arr.push({ id: genId(), t: Date.now(), time: addTime, dist: round(addDist) });
       setEntries(key, arr);
       render();
     }
@@ -2786,10 +2799,14 @@
                onchange="updateEntryText('${e.id}','note',this.value)">`
           : '';
         if (modalType === 'cardio') {
+          const totalSec = Math.round((parseFloat(e.time) || 0) * 60);
+          const em = Math.floor(totalSec / 60), es = totalSec % 60;
           return `<div class="entry-row">
             <span class="entry-time">${t}</span>
-            <input type="number" min="0" class="entry-input" value="${e.time || 0}"
-              onchange="updateEntry('${e.id}','time',this.value)"><span class="entry-u">min</span>
+            <input type="number" min="0" class="entry-input" value="${em}" id="emin_${e.id}"
+              onchange="setCardioTime('${e.id}')"><span class="entry-u">:</span>
+            <input type="number" min="0" max="59" class="entry-input" value="${es}" id="esec_${e.id}"
+              onchange="setCardioTime('${e.id}')"><span class="entry-u">m:ss</span>
             <input type="number" min="0" step="${distStep}" class="entry-input" value="${e.dist || 0}"
               onchange="updateEntry('${e.id}','dist',this.value)"><span class="entry-u">${distUnit}</span>
             ${varInput}${noteInput}
@@ -2837,6 +2854,17 @@
       const arr = getEntries(modalKey);
       const e = arr.find(x => String(x.id) === String(id));
       if (e) { e[field] = round(val); setEntries(modalKey, arr); render(); renderModalBody(); }
+    }
+
+    // Cardio time is edited as two fields (min + sec) that recombine into decimal minutes.
+    function setCardioTime(id) {
+      const arr = getEntries(modalKey);
+      const e = arr.find(x => String(x.id) === String(id));
+      if (!e) return;
+      const min = document.getElementById('emin_' + id).value;
+      const sec = document.getElementById('esec_' + id).value;
+      e.time = minSecToMin(min, sec);
+      setEntries(modalKey, arr); render(); renderModalBody();
     }
 
     function updateEntryText(id, field, val) {
@@ -3314,7 +3342,7 @@
     function reportDetailGroups() {
       return [
         ...EXERCISES.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit || 'reps'}` + varSuffix(e) })),
-        ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.time || 0} min · ${e.dist || 0} ${m.distUnit}` + varSuffix(e) })),
+        ...CARDIO.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${fmtMMSS(e.time)} · ${e.dist || 0} ${m.distUnit}` + varSuffix(e) })),
         ...INTAKE.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} ${m.unit}` + (e.item ? ' · ' + e.item : '') })),
         ...MIND.map(m => ({ key: m.key, label: m.label, icon: m.icon, fmt: e => `${e.v} min` + varSuffix(e) })),
         { key: 'weight', label: 'Weight', icon: '⚖️', fmt: e => `${e.v} kg` },
