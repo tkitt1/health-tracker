@@ -91,15 +91,17 @@
     .theme-toggle {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      padding: 0;
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 7px 16px;
       border-radius: 999px;
       cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
+      font-size: 1.05rem;
+      line-height: 1;
     }
     .theme-toggle:hover { background: var(--surface-hover); }
 
@@ -1217,7 +1219,7 @@
         </svg>
         <div class="header-right">
           <div class="auth-bar" id="authBar"></div>
-          <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓 Auto</button>
+          <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓</button>
         </div>
       </div>
       <div class="date-nav">
@@ -3582,7 +3584,7 @@
       const b = document.getElementById('themeToggle');
       if (!b) return;
       const m = themeMode();
-      b.textContent = m === 'auto' ? '🌓 Auto' : (m === 'light' ? '☀️ Light' : '🌙 Dark');
+      b.textContent = m === 'auto' ? '🌓' : (m === 'light' ? '☀️' : '🌙'); // icon only; mode is in the tooltip
       b.title = m === 'auto' ? 'Theme: Auto (follows your device) — tap for Light'
         : m === 'light' ? 'Theme: Light — tap for Dark'
           : 'Theme: Dark — tap for Auto';
