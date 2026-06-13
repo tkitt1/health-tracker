@@ -162,6 +162,37 @@
       margin-bottom: 10px;
       padding-left: 4px;
     }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .section-head .section-title { margin-bottom: 0; }
+    .scan-btn {
+      margin-bottom: 10px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .scan-btn:hover { background: var(--accent); color: #fff; }
+    .scan-btn:disabled { opacity: 0.6; cursor: default; }
+    .scan-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .scan-name { flex: 1; font-size: 0.9rem; }
+    .scan-in {
+      width: 90px; text-align: right;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 0.9rem;
+    }
+    .scan-unit { width: 36px; font-size: 0.8rem; color: var(--text-muted); }
+    .scan-divider { height: 1px; background: var(--border); margin: 10px 0; }
 
     .card-grid {
       display: grid;
@@ -1219,7 +1250,11 @@
 
     <!-- Intake -->
     <div class="section">
-      <div class="section-title">Intake</div>
+      <div class="section-head">
+        <div class="section-title">Intake</div>
+        <button class="scan-btn" onclick="document.getElementById('labelPhoto').click()" title="Photograph a nutrition label to auto-fill macros">📷 Scan label</button>
+        <input type="file" id="labelPhoto" accept="image/*" capture="environment" style="display:none" onchange="onLabelPhoto(this)">
+      </div>
       <div id="intakeSection"></div>
     </div>
 
@@ -1260,6 +1295,17 @@
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Nutrition label scan review modal -->
+  <div class="modal-overlay" id="scanOverlay" style="display:none" onclick="if(event.target===this)closeScan()">
+    <div class="modal">
+      <div class="modal-header">
+        <span>📷 Scan label</span>
+        <button class="modal-close" onclick="closeScan()">&times;</button>
+      </div>
+      <div class="modal-body" id="scanBody"></div>
     </div>
   </div>
 
@@ -1406,6 +1452,10 @@
       { key: 'protein', label: 'Protein', icon: '🥩', unit: 'g', withItem: true },
       { key: 'carbs', label: 'Carbs', icon: '🍞', unit: 'g' },
       { key: 'calories', label: 'Calories', icon: '🔥', unit: 'kcal' },
+      { key: 'fat', label: 'Fat', icon: '🥑', unit: 'g' },
+      { key: 'fiber', label: 'Fiber', icon: '🌾', unit: 'g' },
+      { key: 'sugar', label: 'Sugar', icon: '🍬', unit: 'g' },
+      { key: 'sodium', label: 'Sodium', icon: '🧂', unit: 'mg' },
     ];
 
     const REPORT_ROWS = [
@@ -2434,6 +2484,126 @@
       render();
     }
 
+    // ---- Scan nutrition label (photo -> Claude vision via Edge Function) ----
+    const NUTRITION_FN_URL = SUPABASE_URL + '/functions/v1/nutrition-label';
+    // Map of label fields -> tracker keys (filled per serving x servings eaten).
+    const SCAN_FIELDS = [
+      { k: 'calories', label: 'Calories', unit: 'kcal' },
+      { k: 'protein',  label: 'Protein',  unit: 'g', src: 'protein_g' },
+      { k: 'carbs',    label: 'Carbs',    unit: 'g', src: 'carbs_g' },
+      { k: 'fat',      label: 'Fat',      unit: 'g', src: 'fat_g' },
+      { k: 'fiber',    label: 'Fiber',    unit: 'g', src: 'fiber_g' },
+      { k: 'sugar',    label: 'Sugar',    unit: 'g', src: 'sugar_g' },
+      { k: 'sodium',   label: 'Sodium',   unit: 'mg', src: 'sodium_mg' },
+    ];
+
+    function closeScan() { document.getElementById('scanOverlay').style.display = 'none'; }
+
+    async function onLabelPhoto(input) {
+      const file = input.files && input.files[0];
+      input.value = ''; // allow re-selecting the same file later
+      if (!file) return;
+
+      if (!currentUser || !sb) {
+        alert('Please sign in to sync first — scanning runs through your account so it stays private and secure.');
+        return;
+      }
+
+      const btn = document.querySelector('.scan-btn');
+      const overlay = document.getElementById('scanOverlay');
+      const body = document.getElementById('scanBody');
+      overlay.style.display = 'flex';
+      body.innerHTML = '<p class="modal-empty">📷 Reading the label…</p>';
+      if (btn) btn.disabled = true;
+
+      try {
+        const { dataUrl, b64 } = await downscaleImage(file, 1024, 0.8);
+        const { data: { session } } = await sb.auth.getSession();
+        const token = session && session.access_token;
+        if (!token) throw new Error('Not signed in.');
+
+        const resp = await fetch(NUTRITION_FN_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ image: b64, media_type: 'image/jpeg' })
+        });
+        const out = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(out.error || ('Scan failed (' + resp.status + ')'));
+        renderScanReview(out, dataUrl);
+      } catch (e) {
+        body.innerHTML = '<p class="modal-empty">Couldn’t read that label.<br><span style="font-size:.8rem">' +
+          (e.message || e) + '</span></p>';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Shrink + re-encode the photo client-side to keep the upload small/cheap.
+    function downscaleImage(file, maxDim, quality) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          let { width, height } = img;
+          if (width > height && width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve({ dataUrl, b64: dataUrl.split(',')[1] });
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read the image.')); };
+        img.src = url;
+      });
+    }
+
+    function renderScanReview(d, dataUrl) {
+      const body = document.getElementById('scanBody');
+      const serving = d.serving_size ? String(d.serving_size) : '';
+      const rows = SCAN_FIELDS.map(f => {
+        const v = d[f.src || f.k];
+        const val = (v === null || v === undefined || isNaN(v)) ? '' : round(v);
+        return `<div class="scan-row">
+            <label class="scan-name">${f.label}</label>
+            <input type="number" min="0" step="0.1" class="scan-in" id="scan_${f.k}" value="${val}">
+            <span class="scan-unit">${f.unit}</span>
+          </div>`;
+      }).join('');
+      body.innerHTML = `
+        ${serving ? `<div class="if-meta" style="margin-bottom:10px">Label serving: ${serving}</div>` : ''}
+        <div class="scan-row">
+          <label class="scan-name">Servings eaten</label>
+          <input type="number" min="0" step="0.5" class="scan-in" id="scan_servings" value="1">
+          <span class="scan-unit">×</span>
+        </div>
+        <div class="scan-divider"></div>
+        ${rows}
+        <p class="if-meta" style="margin-top:10px">Values are per serving — edit any, set servings, then add. Each is logged with a timestamp.</p>
+        <div class="modal-actions" style="margin-top:14px">
+          <button class="add-btn" onclick="confirmScan()">Add to tracker</button>
+          <button class="btn-skip" onclick="closeScan()">Cancel</button>
+        </div>`;
+    }
+
+    function confirmScan() {
+      const mult = parseFloat(document.getElementById('scan_servings').value) || 1;
+      let added = 0;
+      SCAN_FIELDS.forEach(f => {
+        const raw = parseFloat(document.getElementById('scan_' + f.k).value);
+        if (!isNaN(raw) && raw > 0) {
+          const arr = getEntries(f.k);
+          arr.push({ id: genId(), t: Date.now(), v: round(raw * mult) });
+          setEntries(f.k, arr);
+          added++;
+        }
+      });
+      closeScan();
+      render();
+      if (!added) alert('Nothing to add — all values were blank or zero.');
+    }
+
     // ---- Entries modal (view / edit / delete individual entries) ----
     let modalKey = null, modalType = null;
 
@@ -3117,7 +3287,7 @@
       const cols = [
         'date', 'pushups', 'squats', 'pullups', 'dips', 'deadhang_sec', 'kettlebell_rounds', 'sprints', 'jumprope',
         'bike_min', 'bike_km', 'run_min', 'run_km', 'walk_min', 'walk_km', 'swim_min', 'swim_m',
-        'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items', 'carbs_g', 'calories',
+        'coffee_cups', 'last_coffee', 'creatine_g', 'protein_g', 'protein_items', 'carbs_g', 'calories', 'fat_g', 'fiber_g', 'sugar_g', 'sodium_mg',
         'work_periods', 'work_minutes', 'work_start', 'work_end', 'meditation_min', 'reading_min', 'journal_am', 'journal_pm',
         'weight_kg', 'vo2max', 'hrv_ms', 'resting_hr', 'sleep_score', 'body_fat_pct', 'blood_pressure', 'mood', 'workout_notes'
       ];
@@ -3147,6 +3317,7 @@
           sumVal(d.walk, 'time'), sumVal(d.walk, 'dist'),
           sumVal(d.swim, 'time'), sumVal(d.swim, 'dist'),
           sumVal(d.coffee), lastCoffee, sumVal(d.creatine), sumVal(d.protein), proteinItems, sumVal(d.carbs), sumVal(d.calories),
+          sumVal(d.fat), sumVal(d.fiber), sumVal(d.sugar), sumVal(d.sodium),
           d.timer_periods || 0, Math.floor((d.timer_total_work || 0) / 60),
           d.work_started_at ? new Date(d.work_started_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
           d.work_ended_at ? new Date(d.work_ended_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
