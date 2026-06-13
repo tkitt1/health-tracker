@@ -1565,7 +1565,30 @@
       } catch (e) { /* offline — resynced on next focus/login */ }
     }
 
-    // Two-way merge: newest write per key wins (by timestamp).
+    // A day's record (ht_<date>) bundles many independent fields into one synced blob.
+    // work_started_at is "set once, earliest wins" — these helpers keep it alive through
+    // the newest-wins merge so a write from another device can't wipe (and trigger a
+    // re-stamp of) the work-day start time.
+    const isDayRecord = k => /^ht_\d{4}-\d{2}-\d{2}$/.test(k);
+    function earliestStart(aStr, bStr) {
+      const get = s => {
+        try { const v = JSON.parse(s || '{}').work_started_at; return (typeof v === 'number' && v > 0) ? v : 0; }
+        catch (e) { return 0; }
+      };
+      const a = get(aStr), b = get(bStr);
+      if (a && b) return Math.min(a, b);
+      return a || b; // whichever exists, else 0
+    }
+    function withStart(str, start) {
+      if (!start) return str;
+      let d = {}; try { d = JSON.parse(str || '{}'); } catch (e) {}
+      if (d.work_started_at === start) return str;
+      d.work_started_at = start;
+      return JSON.stringify(d);
+    }
+
+    // Two-way merge: newest write per key wins (by timestamp), except work_started_at
+    // on day records, which is preserved as the earliest start across devices.
     async function syncOnLogin() {
       if (!sb || !currentUser) return;
       let data;
@@ -1587,13 +1610,22 @@
         const r = remote[k];
         const lv = localStorage.getItem(k);
         const lts = m[k] || 0;
+        const day = isDayRecord(k);
+        const keepStart = day ? earliestStart(lv, r && r.value) : 0; // earliest work-day start across devices
         if (r && (lv == null || r.ts >= lts)) {
-          if (localStorage.getItem(k) !== r.value) pulledChange = true;
-          localStorage.setItem(k, r.value);   // remote is newer
+          const merged = day ? withStart(r.value, keepStart) : r.value; // remote wins, but never drop an earlier start
+          if (localStorage.getItem(k) !== merged) pulledChange = true;
+          localStorage.setItem(k, merged);
           m[k] = r.ts;
+          if (day && merged !== r.value) { // we restored a start the cloud was missing — push it so devices converge
+            const ts = Date.now(); m[k] = ts;
+            toPush.push({ user_id: currentUser.id, key: k, value: merged, updated_at: new Date(ts).toISOString() });
+          }
         } else if (lv != null && (!r || lts > r.ts)) {
-          const ts = lts || Date.now(); m[k] = ts;   // local is newer / cloud missing
-          toPush.push({ user_id: currentUser.id, key: k, value: lv, updated_at: new Date(ts).toISOString() });
+          const merged = day ? withStart(lv, keepStart) : lv; // local wins, but fold in an earlier start the cloud knew
+          if (merged !== lv) { localStorage.setItem(k, merged); pulledChange = true; }
+          const ts = (merged !== lv) ? Date.now() : (lts || Date.now()); m[k] = ts; // local is newer / cloud missing
+          toPush.push({ user_id: currentUser.id, key: k, value: merged, updated_at: new Date(ts).toISOString() });
         }
       });
       metaSet(m);
