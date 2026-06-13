@@ -1453,10 +1453,10 @@
       { key: 'protein', label: 'Protein', icon: '🥩', unit: 'g', withItem: true },
       { key: 'carbs', label: 'Carbs', icon: '🍞', unit: 'g' },
       { key: 'calories', label: 'Calories', icon: '🔥', unit: 'kcal' },
+      { key: 'sodium', label: 'Sodium', icon: '🧂', unit: 'mg' },
       { key: 'fat', label: 'Fat', icon: '🥑', unit: 'g' },
       { key: 'fiber', label: 'Fiber', icon: '🌾', unit: 'g' },
       { key: 'sugar', label: 'Sugar', icon: '🍬', unit: 'g' },
-      { key: 'sodium', label: 'Sodium', icon: '🧂', unit: 'mg' },
     ];
 
     const REPORT_ROWS = [
@@ -2519,7 +2519,7 @@
         const { dataUrl, b64 } = await downscaleImage(file, 1500, 0.85);
         scanImage = { dataUrl, b64 };
         const T = await loadTesseract();
-        const { data } = await T.recognize(dataUrl, 'eng');
+        const { data } = await T.recognize(dataUrl, 'eng+tha'); // English + Thai labels
         const parsed = ocrParse(data && data.text ? data.text : '');
         renderScanReview(parsed, 'ocr');
       } catch (e) {
@@ -2551,21 +2551,26 @@
     // Best-effort parse of OCR text from a Nutrition Facts label.
     function ocrParse(text) {
       const t = (text || '').replace(/[|]/g, ' ');
-      // For the generic "fat" fallback, drop saturated/trans fat lines so we
-      // don't grab their grams instead of total fat. (Avoids regex lookbehind.)
-      const tNoSubFat = t.replace(/(saturated|trans|sat\.?|poly\w*|mono\w*)\s*fat[^\n]*/gi, '');
+      // For the generic "fat" fallback, drop saturated/trans fat lines (English + Thai)
+      // so we don't grab their grams instead of total fat. (Avoids regex lookbehind.)
+      const tNoSubFat = t
+        .replace(/(saturated|trans|sat\.?|poly\w*|mono\w*)\s*fat[^\n]*/gi, '')
+        .replace(/ไขมัน(?:อิ่มตัว|ทรานส์)[^\n]*/g, '');
       const numIn = (str, re) => { const m = str.match(re); return m ? parseFloat(m[1]) : null; };
       const first = (str, ...res) => { for (const re of res) { const v = numIn(str, re); if (v !== null && !isNaN(v)) return v; } return null; };
-      const servingM = t.match(/serving\s*size[^0-9a-z]*([^\n]+)/i);
+      // Serving size: English "Serving size …" or Thai "หนึ่งหน่วยบริโภค …".
+      const servingM = t.match(/serving\s*size[^0-9a-zก-๙]*([^\n]+)/i)
+        || t.match(/(?:หนึ่งหน่วยบริโภค|ขนาดบริโภค)[^\n:：]*[:：]?\s*([^\n]+)/);
       return {
         serving_size: servingM ? servingM[1].trim().slice(0, 60) : null,
-        calories: first(t, /calories\s*:?\s*(\d{1,4})/i),
-        protein_g: first(t, /protein\s*:?\s*([\d.]+)\s*g/i),
-        carbs_g: first(t, /total\s*carb\w*\s*:?\s*([\d.]+)\s*g/i, /carb\w*\s*:?\s*([\d.]+)\s*g/i),
-        fat_g: first(t, /total\s*fat\s*:?\s*([\d.]+)\s*g/i) ?? first(tNoSubFat, /\bfat\s*:?\s*([\d.]+)\s*g/i),
-        fiber_g: first(t, /(?:dietary\s*)?fiber\s*:?\s*([\d.]+)\s*g/i),
-        sugar_g: first(t, /total\s*sugars?\s*:?\s*([\d.]+)\s*g/i, /sugars?\s*:?\s*([\d.]+)\s*g/i),
-        sodium_mg: first(t, /sodium\s*:?\s*([\d.]+)\s*mg/i),
+        calories: first(t, /calories\s*:?\s*(\d{1,4})/i, /(?:พลังงาน|แคลอร[ีิ])[^\d]{0,12}(\d{1,4})/),
+        protein_g: first(t, /protein\s*:?\s*([\d.]+)\s*g/i, /โปรตีน[^\d]{0,12}([\d.]+)/),
+        carbs_g: first(t, /total\s*carb\w*\s*:?\s*([\d.]+)\s*g/i, /carb\w*\s*:?\s*([\d.]+)\s*g/i, /คาร์โบไฮเดรต(?:ทั้งหมด)?[^\d]{0,12}([\d.]+)/),
+        fat_g: first(t, /total\s*fat\s*:?\s*([\d.]+)\s*g/i, /ไขมันทั้งหมด[^\d]{0,12}([\d.]+)/)
+          ?? first(tNoSubFat, /\bfat\s*:?\s*([\d.]+)\s*g/i, /ไขมัน[^\d]{0,12}([\d.]+)/),
+        fiber_g: first(t, /(?:dietary\s*)?fiber\s*:?\s*([\d.]+)\s*g/i, /ใยอาหาร[^\d]{0,12}([\d.]+)/),
+        sugar_g: first(t, /total\s*sugars?\s*:?\s*([\d.]+)\s*g/i, /sugars?\s*:?\s*([\d.]+)\s*g/i, /น้ำตาล[^\d]{0,12}([\d.]+)/),
+        sodium_mg: first(t, /sodium\s*:?\s*([\d.]+)\s*mg/i, /โซเดียม[^\d]{0,12}([\d.]+)/),
       };
     }
 

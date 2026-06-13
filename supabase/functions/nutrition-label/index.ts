@@ -54,11 +54,15 @@ const SCHEMA = {
 };
 
 const PROMPT =
-  'This image is a Nutrition Facts label. Read it and return the values PER SERVING ' +
-  '(not per container). Use numbers only with no units: calories in kcal; protein, ' +
-  'total carbohydrate, total fat, dietary fiber, and total sugars in grams; sodium in ' +
-  'milligrams. Put the serving size text (e.g. "2/3 cup (55g)") in serving_size. If a ' +
-  'value is not visible or not on the label, return null for it. Do not guess.';
+  'This image is a Nutrition Facts label. It may be in ANY language (e.g. Thai, ' +
+  'Japanese, Spanish) — read and interpret it regardless, translating the nutrient ' +
+  'names yourself (e.g. Thai: พลังงาน=calories, โปรตีน=protein, ไขมันทั้งหมด=total fat, ' +
+  'คาร์โบไฮเดรต=carbohydrate, ใยอาหาร=fiber, น้ำตาล=sugars, โซเดียม=sodium). Return the ' +
+  'values PER SERVING (not per container). Use numbers only with no units: calories in ' +
+  'kcal; protein, total carbohydrate, total fat, dietary fiber, and total sugars in ' +
+  'grams; sodium in milligrams. Put the serving size text in serving_size (translate it ' +
+  'to English if needed). If a value is not visible or not on the label, return null for ' +
+  'it. Do not guess.';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
