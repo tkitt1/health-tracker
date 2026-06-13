@@ -193,6 +193,7 @@
     }
     .scan-unit { width: 36px; font-size: 0.8rem; color: var(--text-muted); }
     .scan-divider { height: 1px; background: var(--border); margin: 10px 0; }
+    .modal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .card-grid {
       display: grid;
@@ -2499,42 +2500,100 @@
 
     function closeScan() { document.getElementById('scanOverlay').style.display = 'none'; }
 
+    // The most recent scanned image, so "re-read with Claude" can reuse it.
+    let scanImage = { dataUrl: '', b64: '' };
+
     async function onLabelPhoto(input) {
       const file = input.files && input.files[0];
       input.value = ''; // allow re-selecting the same file later
       if (!file) return;
 
-      if (!currentUser || !sb) {
-        alert('Please sign in to sync first — scanning runs through your account so it stays private and secure.');
-        return;
-      }
-
       const btn = document.querySelector('.scan-btn');
       const overlay = document.getElementById('scanOverlay');
       const body = document.getElementById('scanBody');
       overlay.style.display = 'flex';
-      body.innerHTML = '<p class="modal-empty">📷 Reading the label…</p>';
+      body.innerHTML = '<p class="modal-empty">📷 Reading the label on-device…</p>';
       if (btn) btn.disabled = true;
 
       try {
-        const { dataUrl, b64 } = await downscaleImage(file, 1024, 0.8);
+        const { dataUrl, b64 } = await downscaleImage(file, 1500, 0.85);
+        scanImage = { dataUrl, b64 };
+        const T = await loadTesseract();
+        const { data } = await T.recognize(dataUrl, 'eng');
+        const parsed = ocrParse(data && data.text ? data.text : '');
+        renderScanReview(parsed, 'ocr');
+      } catch (e) {
+        body.innerHTML = '<p class="modal-empty">Couldn’t read that label on-device.<br>' +
+          '<span style="font-size:.8rem">' + (e.message || e) + '</span></p>' +
+          '<div class="modal-actions" style="margin-top:14px">' +
+          '<button class="add-btn" onclick="rescanWithClaude()">🤖 Try Claude</button>' +
+          '<button class="btn-skip" onclick="closeScan()">Cancel</button></div>';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Lazy-load Tesseract.js (only on first scan) so it never bloats page load.
+    let _tesseract = null;
+    function loadTesseract() {
+      if (window.Tesseract) return Promise.resolve(window.Tesseract);
+      if (_tesseract) return _tesseract;
+      _tesseract = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('OCR failed to load'));
+        s.onerror = () => reject(new Error('Could not load the OCR engine (offline?)'));
+        document.head.appendChild(s);
+      });
+      return _tesseract;
+    }
+
+    // Best-effort parse of OCR text from a Nutrition Facts label.
+    function ocrParse(text) {
+      const t = (text || '').replace(/[|]/g, ' ');
+      // For the generic "fat" fallback, drop saturated/trans fat lines so we
+      // don't grab their grams instead of total fat. (Avoids regex lookbehind.)
+      const tNoSubFat = t.replace(/(saturated|trans|sat\.?|poly\w*|mono\w*)\s*fat[^\n]*/gi, '');
+      const numIn = (str, re) => { const m = str.match(re); return m ? parseFloat(m[1]) : null; };
+      const first = (str, ...res) => { for (const re of res) { const v = numIn(str, re); if (v !== null && !isNaN(v)) return v; } return null; };
+      const servingM = t.match(/serving\s*size[^0-9a-z]*([^\n]+)/i);
+      return {
+        serving_size: servingM ? servingM[1].trim().slice(0, 60) : null,
+        calories: first(t, /calories\s*:?\s*(\d{1,4})/i),
+        protein_g: first(t, /protein\s*:?\s*([\d.]+)\s*g/i),
+        carbs_g: first(t, /total\s*carb\w*\s*:?\s*([\d.]+)\s*g/i, /carb\w*\s*:?\s*([\d.]+)\s*g/i),
+        fat_g: first(t, /total\s*fat\s*:?\s*([\d.]+)\s*g/i) ?? first(tNoSubFat, /\bfat\s*:?\s*([\d.]+)\s*g/i),
+        fiber_g: first(t, /(?:dietary\s*)?fiber\s*:?\s*([\d.]+)\s*g/i),
+        sugar_g: first(t, /total\s*sugars?\s*:?\s*([\d.]+)\s*g/i, /sugars?\s*:?\s*([\d.]+)\s*g/i),
+        sodium_mg: first(t, /sodium\s*:?\s*([\d.]+)\s*mg/i),
+      };
+    }
+
+    // Fallback: send the same image to Claude vision via the Edge Function.
+    async function rescanWithClaude() {
+      const body = document.getElementById('scanBody');
+      if (!currentUser || !sb) {
+        alert('Sign in to sync first — the Claude reader runs through your account so it stays private and secure.');
+        return;
+      }
+      if (!scanImage.b64) { alert('No image to re-read — scan a label first.'); return; }
+      body.innerHTML = '<p class="modal-empty">🤖 Re-reading with Claude…</p>';
+      try {
         const { data: { session } } = await sb.auth.getSession();
         const token = session && session.access_token;
         if (!token) throw new Error('Not signed in.');
-
         const resp = await fetch(NUTRITION_FN_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ image: b64, media_type: 'image/jpeg' })
+          body: JSON.stringify({ image: scanImage.b64, media_type: 'image/jpeg' })
         });
         const out = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(out.error || ('Scan failed (' + resp.status + ')'));
-        renderScanReview(out, dataUrl);
+        if (!resp.ok) throw new Error(out.error || ('Claude scan failed (' + resp.status + ')'));
+        renderScanReview(out, 'claude');
       } catch (e) {
-        body.innerHTML = '<p class="modal-empty">Couldn’t read that label.<br><span style="font-size:.8rem">' +
-          (e.message || e) + '</span></p>';
-      } finally {
-        if (btn) btn.disabled = false;
+        body.innerHTML = '<p class="modal-empty">Claude couldn’t read it either.<br>' +
+          '<span style="font-size:.8rem">' + (e.message || e) + '</span></p>' +
+          '<div class="modal-actions" style="margin-top:14px"><button class="btn-skip" onclick="closeScan()">Close</button></div>';
       }
     }
 
@@ -2559,20 +2618,29 @@
       });
     }
 
-    function renderScanReview(d, dataUrl) {
+    function renderScanReview(d, source) {
       const body = document.getElementById('scanBody');
       const serving = d.serving_size ? String(d.serving_size) : '';
+      let filled = 0;
       const rows = SCAN_FIELDS.map(f => {
         const v = d[f.src || f.k];
-        const val = (v === null || v === undefined || isNaN(v)) ? '' : round(v);
+        const has = !(v === null || v === undefined || isNaN(v));
+        if (has) filled++;
         return `<div class="scan-row">
             <label class="scan-name">${f.label}</label>
-            <input type="number" min="0" step="0.1" class="scan-in" id="scan_${f.k}" value="${val}">
+            <input type="number" min="0" step="0.1" class="scan-in" id="scan_${f.k}" value="${has ? round(v) : ''}">
             <span class="scan-unit">${f.unit}</span>
           </div>`;
       }).join('');
+      const sourceNote = source === 'claude'
+        ? 'Read by Claude.'
+        : `Read on-device (free).${filled < 4 ? ' Looks incomplete — try Claude for a better read.' : ''}`;
+      const claudeBtn = source === 'claude'
+        ? ''
+        : `<button class="btn-skip" onclick="rescanWithClaude()" title="More accurate; uses a small amount of API credit">🤖 Re-read with Claude</button>`;
       body.innerHTML = `
-        ${serving ? `<div class="if-meta" style="margin-bottom:10px">Label serving: ${serving}</div>` : ''}
+        ${serving ? `<div class="if-meta" style="margin-bottom:6px">Label serving: ${serving}</div>` : ''}
+        <div class="if-meta" style="margin-bottom:10px">${sourceNote}</div>
         <div class="scan-row">
           <label class="scan-name">Servings eaten</label>
           <input type="number" min="0" step="0.5" class="scan-in" id="scan_servings" value="1">
@@ -2583,6 +2651,7 @@
         <p class="if-meta" style="margin-top:10px">Values are per serving — edit any, set servings, then add. Each is logged with a timestamp.</p>
         <div class="modal-actions" style="margin-top:14px">
           <button class="add-btn" onclick="confirmScan()">Add to tracker</button>
+          ${claudeBtn}
           <button class="btn-skip" onclick="closeScan()">Cancel</button>
         </div>`;
     }
