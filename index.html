@@ -213,12 +213,27 @@
       gap: 12px;
     }
 
-    /* INTAKE: fixed 2-column grid (2×2…) */
+    /* INTAKE: 3-column grid; secondary cards hidden until "Show more" */
     .intake-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 12px;
     }
+    .intake-grid.collapsed .intake-extra { display: none; }
+    .intake-more {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 9px 16px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      width: 100%;
+      text-align: center;
+      margin-top: 12px;
+    }
+    .intake-more:hover { background: var(--surface-hover); color: var(--text); }
 
     .card {
       background: var(--surface);
@@ -1161,6 +1176,7 @@
 
     @media (max-width: 600px) {
       .card-grid { grid-template-columns: 1fr 1fr; }
+      .intake-grid { grid-template-columns: 1fr 1fr; }
       .mind-grid { grid-template-columns: 1fr; }
       .timer-time { font-size: 2.5rem; }
     }
@@ -2215,9 +2231,15 @@
     }
 
     // Intake (field entry)
+    // Intake cards shown by default; the rest sit behind "Show more".
+    const INTAKE_DEFAULT = ['coffee', 'creatine', 'protein'];
+    let intakeExpanded = false;
+    function toggleIntakeMore() { intakeExpanded = !intakeExpanded; renderIntake(); }
+
     function renderIntake() {
       const section = document.getElementById('intakeSection');
       const cards = INTAKE.map(item => {
+        const extra = INTAKE_DEFAULT.indexOf(item.key) === -1;
         const entries = getEntries(item.key);
         const total = sumEntries(item.key);
         const n = entries.length;
@@ -2236,7 +2258,7 @@
                onkeydown="if(event.key==='Enter')addCount('${item.key}')">`
           : '';
         return `
-          <div class="card">
+          <div class="card${extra ? ' intake-extra' : ''}">
             <div class="card-header">
               <span class="card-icon">${item.icon}</span>
               <span class="card-label">${item.label}</span>
@@ -2252,7 +2274,11 @@
             </div>
           </div>`;
       }).join('');
-      section.innerHTML = `<div class="intake-grid">${cards}</div>`;
+      const extraCount = INTAKE.filter(i => INTAKE_DEFAULT.indexOf(i.key) === -1).length;
+      const moreBtn = extraCount
+        ? `<button class="intake-more" onclick="toggleIntakeMore()">${intakeExpanded ? 'Show less' : 'Show more (' + extraCount + ')'}</button>`
+        : '';
+      section.innerHTML = `<div class="intake-grid${intakeExpanded ? '' : ' collapsed'}">${cards}</div>${moreBtn}`;
     }
 
     // IF
