@@ -9,7 +9,7 @@ const EXERCISES = ['pushups','squats','pullups','dips','deadhang','kettlebell','
 const CARDIO = ['bike','run','walk','swim'];
 
 // --- logic under test (kept identical to index.html) ---
-function makeApi(currentDate, store) {
+function makeApi(currentDate, store, journalAm = false) {
   function dayBounds() {
     const d = currentDate;
     const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
@@ -30,7 +30,8 @@ function makeApi(currentDate, store) {
   function morningAuto() {
     const pool = [...EXERCISES, ...CARDIO];
     const exCount = pool.filter(loggedBefore9).length;
-    return exCount >= 2 && loggedBefore9('reading') && loggedBefore9('meditation');
+    // AM journal is a checkbox (no timestamp) -> just must be checked.
+    return exCount >= 2 && loggedBefore9('reading') && loggedBefore9('meditation') && !!journalAm;
   }
   return { morningAuto, loggedBefore9 };
 }
@@ -45,14 +46,23 @@ function ok(name, got, want) {
   else { fail++; console.log(`  ✗ ${name}\n      got ${got}, want ${want}`); }
 }
 
-// 1. Happy path: 2 distinct activities + reading + meditation, all before 9am.
-ok('2 ex/cardio + reading + meditation before 9am -> complete',
+// 1. Happy path: 2 distinct activities + reading + meditation + AM journal.
+ok('2 ex/cardio + reading + meditation + AM journal -> complete',
   makeApi(D, {
     pushups: [{ t: at(7), v: 20 }],
     run: [{ t: at(7, 30), time: 5, dist: 1 }],
     reading: [{ t: at(8), v: 15 }],
     meditation: [{ t: at(8, 30), v: 10 }],
-  }).morningAuto(), true);
+  }, true).morningAuto(), true);
+
+// 1b. Same but AM journal not done -> incomplete.
+ok('all activities but AM journal missing -> incomplete',
+  makeApi(D, {
+    pushups: [{ t: at(7), v: 20 }],
+    run: [{ t: at(7, 30), time: 5, dist: 1 }],
+    reading: [{ t: at(8), v: 15 }],
+    meditation: [{ t: at(8, 30), v: 10 }],
+  }, false).morningAuto(), false);
 
 // 2. Only 1 activity before 9am -> incomplete.
 ok('only 1 ex/cardio -> incomplete',
@@ -98,13 +108,13 @@ ok('cardio distance-only counts',
   makeApi(D, { walk: [{ t: at(7), time: 0, dist: 2 }] }).loggedBefore9('walk'), true);
 
 // 9. Two cardio items (no exercises) satisfy the "2 of exercise OR cardio" pool.
-ok('two cardio items + reading + meditation -> complete',
+ok('two cardio items + reading + meditation + AM journal -> complete',
   makeApi(D, {
     run: [{ t: at(7), time: 5, dist: 1 }],
     swim: [{ t: at(7, 30), time: 10, dist: 200 }],
     reading: [{ t: at(8), v: 15 }],
     meditation: [{ t: at(8), v: 10 }],
-  }).morningAuto(), true);
+  }, true).morningAuto(), true);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -246,9 +246,11 @@
       font-weight: 600;
     }
 
-    /* Routines (auto-computed daily summary cards, tap to override) */
+    /* Routines (full-width daily summary cards; tap to expand the checklist) */
+    .routines-grid { display: flex; flex-direction: column; gap: 12px; }
     .routine-card { cursor: pointer; user-select: none; }
     .routine-card.done { border-color: var(--green); background: var(--green-glow); }
+    .routine-card .card-header { margin-bottom: 0; }
     .routine-state {
       margin-left: auto;
       font-size: 0.72rem;
@@ -257,7 +259,13 @@
       white-space: nowrap;
     }
     .routine-card.done .routine-state { color: var(--green); }
-    .routine-checks { display: flex; flex-direction: column; gap: 7px; }
+    .routine-chevron {
+      color: var(--text-muted); font-size: 0.7rem; transition: transform 0.15s; margin-left: 2px;
+    }
+    .routine-card.expanded .routine-chevron { transform: rotate(90deg); }
+    /* Collapsed by default; revealed when the card is expanded */
+    .routine-checks { display: none; flex-direction: column; gap: 7px; margin-top: 12px; }
+    .routine-card.expanded .routine-checks { display: flex; }
     .routine-check {
       display: flex; align-items: center; gap: 8px;
       font-size: 0.8rem; color: var(--text-muted);
@@ -271,6 +279,12 @@
     }
     .routine-check.met .routine-check-box { border-color: var(--green); background: var(--green-glow); }
     .routine-check-detail { color: var(--text-muted); }
+    .routine-override {
+      align-self: flex-start; margin-top: 4px;
+      background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: 8px; padding: 5px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    }
+    .routine-override:hover { background: var(--surface-hover); color: var(--text); }
 
     .counter {
       display: flex;
@@ -1345,7 +1359,7 @@
     <!-- Routines -->
     <div class="section">
       <div class="section-title">Routines</div>
-      <div class="card-grid" id="routinesGrid"></div>
+      <div class="routines-grid" id="routinesGrid"></div>
     </div>
 
     <!-- History -->
@@ -2531,12 +2545,14 @@
       const exCount = pool.filter(loggedBefore9).length;
       const reading = loggedBefore9('reading');
       const meditation = loggedBefore9('meditation');
+      const amJournal = !!getField('journal_am', false); // checkbox (no timestamp -> no 9am check)
       return {
-        auto: exCount >= 2 && reading && meditation,
+        auto: exCount >= 2 && reading && meditation && amJournal,
         checks: [
           { label: '2+ exercise/cardio before 9am', met: exCount >= 2, detail: `${Math.min(exCount, 2)}/2` },
           { label: 'Reading before 9am', met: reading },
           { label: 'Meditation before 9am', met: meditation },
+          { label: 'AM journal done', met: amJournal },
         ],
       };
     }
@@ -2549,7 +2565,12 @@
       const v = getField(key, null);
       return (v === true || v === false) ? v : null; // null = follow the auto result
     }
-    function toggleRoutine(key) {
+    const routineExpanded = {}; // per-card open/closed state (ephemeral, survives re-renders)
+    function toggleRoutineExpand(key) {
+      routineExpanded[key] = !routineExpanded[key];
+      renderRoutines();
+    }
+    function toggleRoutine(key) { // manual override for the day (button inside the checklist)
       const st = ROUTINES.find(r => r.key === key).status();
       const ov = routineOverride(key);
       const cur = (ov === null) ? st.auto : ov;
@@ -2563,19 +2584,24 @@
         const st = r.status();
         const ov = routineOverride(r.key);
         const done = (ov === null) ? st.auto : ov;
+        const expanded = !!routineExpanded[r.key];
         const checks = st.checks.map(c =>
           `<div class="routine-check ${c.met ? 'met' : ''}">
              <span class="routine-check-box">${c.met ? '✓' : ''}</span>
              <span>${c.label}${c.detail ? ` <span class="routine-check-detail">(${c.detail})</span>` : ''}</span>
            </div>`).join('');
         return `
-          <div class="card routine-card ${done ? 'done' : ''}" onclick="toggleRoutine('${r.key}')" title="Tap to toggle manually">
+          <div class="card routine-card ${done ? 'done' : ''} ${expanded ? 'expanded' : ''}" onclick="toggleRoutineExpand('${r.key}')" title="Tap to show conditions">
             <div class="card-header">
               <span class="card-icon">${r.icon}</span>
               <span class="card-label">${r.label}</span>
               <span class="routine-state">${done ? '✓ Completed' : 'Not yet'}${ov !== null ? ' · manual' : ''}</span>
+              <span class="routine-chevron">▸</span>
             </div>
-            <div class="routine-checks">${checks}</div>
+            <div class="routine-checks">
+              ${checks}
+              <button class="routine-override" onclick="event.stopPropagation();toggleRoutine('${r.key}')">${done ? 'Mark incomplete' : 'Mark complete'}</button>
+            </div>
           </div>`;
       }).join('');
     }
