@@ -2136,10 +2136,16 @@
       const arr = getEntries(key);
       arr.push(entry);
       setEntries(key, arr);
-      render();
-      // Keep the cursor in the same input (now cleared) so you can log again without re-tapping.
-      const again = document.getElementById(key + '_in');
-      if (again) again.focus();
+      // Update in place (don't rebuild the card) so the input keeps focus and the
+      // mobile keyboard stays up — you can log rep after rep without re-tapping.
+      el.value = '';
+      if (itemEl) itemEl.value = '';
+      const tv = document.getElementById('tv_' + key);
+      if (tv) tv.textContent = sumEntries(key);
+      const elk = document.getElementById('el_' + key);
+      if (elk) elk.textContent = 'edit (' + arr.length + ')';
+      renderRoutines(); // reading/meditation feed the routine checklist
+      el.focus();
     }
 
     // Edit the timestamp of the most recent entry (e.g. last coffee)
@@ -2170,10 +2176,10 @@
             <div class="card-header">
               <span class="card-icon">${ex.icon}</span>
               <span class="card-label">${ex.label}</span>
-              <span class="view-link" onclick="openEntries('${ex.key}','count')">edit${n ? ` (${n})` : ''}</span>
+              <span class="view-link" id="el_${ex.key}" onclick="openEntries('${ex.key}','count')">edit${n ? ` (${n})` : ''}</span>
             </div>
             <div class="total-line">
-              <span class="total-value">${total}</span><span class="total-unit">${unit}</span>
+              <span class="total-value" id="tv_${ex.key}">${total}</span><span class="total-unit">${unit}</span>
             </div>
             <div class="add-row">
               <input type="number" min="0" placeholder="+ ${unit}" id="${ex.key}_in"
@@ -2265,9 +2271,9 @@
             <div class="card-header">
               <span class="card-icon">${item.icon}</span>
               <span class="card-label">${item.label}</span>
-              <span class="view-link" onclick="openEntries('${item.key}','count')">edit${n ? ` (${n})` : ''}</span>
+              <span class="view-link" id="el_${item.key}" onclick="openEntries('${item.key}','count')">edit${n ? ` (${n})` : ''}</span>
             </div>
-            <div class="total-line"><span class="total-value">${total}</span><span class="total-unit">${item.unit}</span></div>
+            <div class="total-line"><span class="total-value" id="tv_${item.key}">${total}</span><span class="total-unit">${item.unit}</span></div>
             ${lastMeta}
             <div class="add-row">
               <input type="number" min="0" placeholder="+ ${item.unit}" id="${item.key}_in"
@@ -2516,10 +2522,10 @@
             <div class="card-header">
               <span class="card-icon">${m.icon}</span>
               <span class="card-label">${m.label}</span>
-              <span class="view-link" onclick="openEntries('${m.key}','count')">edit${n ? ` (${n})` : ''}</span>
+              <span class="view-link" id="el_${m.key}" onclick="openEntries('${m.key}','count')">edit${n ? ` (${n})` : ''}</span>
             </div>
             <div class="total-line">
-              <span class="total-value">${total}</span><span class="total-unit">min total</span>
+              <span class="total-value" id="tv_${m.key}">${total}</span><span class="total-unit">min total</span>
             </div>
             <div class="add-row">
               <input type="number" min="0" placeholder="+ min" id="${m.key}_in"
