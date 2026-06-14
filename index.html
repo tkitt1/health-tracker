@@ -246,6 +246,32 @@
       font-weight: 600;
     }
 
+    /* Routines (auto-computed daily summary cards, tap to override) */
+    .routine-card { cursor: pointer; user-select: none; }
+    .routine-card.done { border-color: var(--green); background: var(--green-glow); }
+    .routine-state {
+      margin-left: auto;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .routine-card.done .routine-state { color: var(--green); }
+    .routine-checks { display: flex; flex-direction: column; gap: 7px; }
+    .routine-check {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; color: var(--text-muted);
+    }
+    .routine-check.met { color: var(--text); }
+    .routine-check-box {
+      width: 18px; height: 18px; flex: 0 0 18px;
+      border: 1px solid var(--border); border-radius: 5px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; line-height: 1; color: var(--green);
+    }
+    .routine-check.met .routine-check-box { border-color: var(--green); background: var(--green-glow); }
+    .routine-check-detail { color: var(--text-muted); }
+
     .counter {
       display: flex;
       align-items: center;
@@ -1316,6 +1342,12 @@
       <div class="mind-grid" id="mindGrid"></div>
     </div>
 
+    <!-- Routines -->
+    <div class="section">
+      <div class="section-title">Routines</div>
+      <div class="card-grid" id="routinesGrid"></div>
+    </div>
+
     <!-- History -->
     <div class="section">
       <div class="history-actions">
@@ -1525,6 +1557,11 @@
     const MIND = [
       { key: 'meditation', label: 'Meditation', icon: '🧘' },
       { key: 'reading', label: 'Reading', icon: '📖' },
+    ];
+
+    const ROUTINES = [
+      { key: 'morning_routine', label: 'Morning Routine', icon: '🌅', status: () => morningStatus() },
+      { key: 'evening_routine', label: 'Evening Routine', icon: '🌙', status: () => eveningStatus() },
     ];
 
     const WORK_DURATION = 30 * 60;
@@ -2468,6 +2505,79 @@
       const pmEl = document.getElementById('journalPm');
       if (amEl) amEl.checked = !!getField('journal_am', false);
       if (pmEl) pmEl.checked = !!getField('journal_pm', false);
+    }
+
+    // ---- Routines (auto-computed daily summaries with per-day manual override) ----
+    // Window for the day being viewed: [midnight, 9am) local.
+    function dayBounds() {
+      const d = currentDate;
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+      const cut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0, 0).getTime();
+      return { start, cut };
+    }
+    // Did `key` get a real entry (value > 0) timestamped before 9am on the viewed day?
+    function loggedBefore9(key) {
+      const { start, cut } = dayBounds();
+      return getEntries(key).some(e => {
+        const t = +e.t || 0;
+        if (t < start || t >= cut) return false; // outside 00:00–09:00 (also excludes legacy t=0)
+        const val = (e.v != null && e.v !== '') ? parseFloat(e.v)
+          : (parseFloat(e.time) || 0) + (parseFloat(e.dist) || 0); // cardio: time or distance
+        return (parseFloat(val) || 0) > 0;
+      });
+    }
+    function morningStatus() {
+      const pool = [...EXERCISES, ...CARDIO].map(x => x.key);
+      const exCount = pool.filter(loggedBefore9).length;
+      const reading = loggedBefore9('reading');
+      const meditation = loggedBefore9('meditation');
+      return {
+        auto: exCount >= 2 && reading && meditation,
+        checks: [
+          { label: '2+ exercise/cardio before 9am', met: exCount >= 2, detail: `${Math.min(exCount, 2)}/2` },
+          { label: 'Reading before 9am', met: reading },
+          { label: 'Meditation before 9am', met: meditation },
+        ],
+      };
+    }
+    // Conditions to be provided — stubbed until then.
+    function eveningStatus() {
+      return { auto: false, checks: [{ label: 'Conditions not set yet', met: false }] };
+    }
+
+    function routineOverride(key) {
+      const v = getField(key, null);
+      return (v === true || v === false) ? v : null; // null = follow the auto result
+    }
+    function toggleRoutine(key) {
+      const st = ROUTINES.find(r => r.key === key).status();
+      const ov = routineOverride(key);
+      const cur = (ov === null) ? st.auto : ov;
+      saveField(key, !cur); // explicit per-day override
+      render();
+    }
+    function renderRoutines() {
+      const grid = document.getElementById('routinesGrid');
+      if (!grid) return;
+      grid.innerHTML = ROUTINES.map(r => {
+        const st = r.status();
+        const ov = routineOverride(r.key);
+        const done = (ov === null) ? st.auto : ov;
+        const checks = st.checks.map(c =>
+          `<div class="routine-check ${c.met ? 'met' : ''}">
+             <span class="routine-check-box">${c.met ? '✓' : ''}</span>
+             <span>${c.label}${c.detail ? ` <span class="routine-check-detail">(${c.detail})</span>` : ''}</span>
+           </div>`).join('');
+        return `
+          <div class="card routine-card ${done ? 'done' : ''}" onclick="toggleRoutine('${r.key}')" title="Tap to toggle manually">
+            <div class="card-header">
+              <span class="card-icon">${r.icon}</span>
+              <span class="card-label">${r.label}</span>
+              <span class="routine-state">${done ? '✓ Completed' : 'Not yet'}${ov !== null ? ' · manual' : ''}</span>
+            </div>
+            <div class="routine-checks">${checks}</div>
+          </div>`;
+      }).join('');
     }
 
     // ---- Body measurements (show latest reading) ----
@@ -3591,6 +3701,7 @@
       renderMeasures();
       renderIF();
       renderMind();
+      renderRoutines();
       refreshTimerUI();
       updateSoundBtn();
     }
