@@ -181,6 +181,28 @@
       gap: 10px;
     }
     .section-head .section-title { margin-bottom: 0; }
+    /* Collapsible sections */
+    .section-toggle {
+      cursor: pointer;
+      user-select: none;
+      justify-content: flex-start;
+      margin-bottom: 10px;
+    }
+    .section-summary {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .section-chevron {
+      margin-left: auto;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      transition: transform 0.15s;
+    }
+    .section.collapsed .section-chevron { transform: rotate(-90deg); }
+    .section.collapsed > :not(.section-head) { display: none; }
     .scan-btn {
       margin-bottom: 10px;
       background: var(--accent-glow);
@@ -1288,21 +1310,33 @@
     </header>
 
     <!-- Exercise Counters -->
-    <div class="section">
-      <div class="section-title">Exercise</div>
+    <div class="section" id="sec-exercise">
+      <div class="section-head section-toggle" onclick="toggleSection('exercise')">
+        <span class="section-title">Exercise</span>
+        <span class="section-summary" id="sum-exercise"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="card-grid" id="exerciseGrid"></div>
     </div>
 
 
     <!-- Cardio -->
-    <div class="section">
-      <div class="section-title">Cardio</div>
+    <div class="section" id="sec-cardio">
+      <div class="section-head section-toggle" onclick="toggleSection('cardio')">
+        <span class="section-title">Cardio</span>
+        <span class="section-summary" id="sum-cardio"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="card-grid" id="cardioGrid"></div>
     </div>
 
     <!-- Work Timer (Pomodoro-style) -->
-    <div class="section">
-      <div class="section-title">Work Timer</div>
+    <div class="section" id="sec-timer">
+      <div class="section-head section-toggle" onclick="toggleSection('timer')">
+        <span class="section-title">Work Timer</span>
+        <span class="section-summary" id="sum-timer"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="timer-card">
         <div class="timer-display">
           <div class="timer-time" id="timerDisplay">30:00</div>
@@ -1346,36 +1380,54 @@
     </div>
 
     <!-- Intake -->
-    <div class="section">
-      <div class="section-head">
-        <div class="section-title">Intake</div>
-        <button class="scan-btn" onclick="document.getElementById('labelPhoto').click()" title="Photograph a nutrition label to auto-fill macros">📷 Scan label</button>
+    <div class="section" id="sec-intake">
+      <div class="section-head section-toggle" onclick="toggleSection('intake')">
+        <span class="section-title">Intake</span>
+        <span class="section-summary" id="sum-intake"></span>
+        <button class="scan-btn" style="margin:0 0 0 auto" onclick="event.stopPropagation();document.getElementById('labelPhoto').click()" title="Photograph a nutrition label to auto-fill macros">📷 Scan label</button>
         <input type="file" id="labelPhoto" accept="image/*" capture="environment" style="display:none" onchange="onLabelPhoto(this)">
+        <span class="section-chevron">▾</span>
       </div>
       <div id="intakeSection"></div>
     </div>
 
     <!-- Measurements -->
-    <div class="section">
-      <div class="section-title">Measurements</div>
+    <div class="section" id="sec-measures">
+      <div class="section-head section-toggle" onclick="toggleSection('measures')">
+        <span class="section-title">Measurements</span>
+        <span class="section-summary" id="sum-measures"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="card-grid" id="measuresGrid"></div>
     </div>
 
     <!-- Intermittent Fasting -->
-    <div class="section">
-      <div class="section-title">Intermittent Fasting</div>
+    <div class="section" id="sec-fasting">
+      <div class="section-head section-toggle" onclick="toggleSection('fasting')">
+        <span class="section-title">Intermittent Fasting</span>
+        <span class="section-summary" id="sum-fasting"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="if-card" id="ifCard"></div>
     </div>
 
     <!-- Mind -->
-    <div class="section">
-      <div class="section-title">Mind</div>
+    <div class="section" id="sec-mind">
+      <div class="section-head section-toggle" onclick="toggleSection('mind')">
+        <span class="section-title">Mind</span>
+        <span class="section-summary" id="sum-mind"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="mind-grid" id="mindGrid"></div>
     </div>
 
     <!-- Routines -->
-    <div class="section">
-      <div class="section-title">Routines</div>
+    <div class="section" id="sec-routines">
+      <div class="section-head section-toggle" onclick="toggleSection('routines')">
+        <span class="section-title">Routines</span>
+        <span class="section-summary" id="sum-routines"></span>
+        <span class="section-chevron">▾</span>
+      </div>
       <div class="routines-grid" id="routinesGrid"></div>
     </div>
 
@@ -1612,7 +1664,7 @@
     }
 
     // Device-local preferences — never synced (theme follows each device's OS; sound is per-device).
-    const LOCAL_ONLY_KEYS = ['ht_meta', 'ht_theme', 'ht_sound'];
+    const LOCAL_ONLY_KEYS = ['ht_meta', 'ht_theme', 'ht_sound', 'ht_collapsed'];
 
     function metaGet() { try { return JSON.parse(localStorage.getItem('ht_meta') || '{}'); } catch (e) { return {}; } }
     function metaSet(m) { localStorage.setItem('ht_meta', JSON.stringify(m)); }
@@ -2145,6 +2197,7 @@
       const elk = document.getElementById('el_' + key);
       if (elk) elk.textContent = 'edit (' + arr.length + ')';
       renderRoutines(); // reading/meditation feed the routine checklist
+      updateSectionSummaries(); // keep collapsed-header counts current
       el.focus();
     }
 
@@ -3810,6 +3863,40 @@
     }
 
     // Main render
+    // ---- Collapsible sections (device-local layout preference) ----
+    const SECTION_IDS = ['exercise', 'cardio', 'timer', 'intake', 'measures', 'fasting', 'mind', 'routines'];
+    const COLLAPSE_DEFAULTS = { measures: true, fasting: true }; // pre-collapsed on a fresh device
+    function getCollapseState() {
+      let s; try { s = JSON.parse(localStorage.getItem('ht_collapsed') || 'null'); } catch (e) {}
+      return (s && typeof s === 'object') ? s : { ...COLLAPSE_DEFAULTS };
+    }
+    function toggleSection(id) {
+      const s = getCollapseState();
+      s[id] = !s[id];
+      localStorage.setItem('ht_collapsed', JSON.stringify(s));
+      const sec = document.getElementById('sec-' + id);
+      if (sec) sec.classList.toggle('collapsed', !!s[id]);
+    }
+    function applyCollapsed() {
+      const s = getCollapseState();
+      SECTION_IDS.forEach(id => {
+        const sec = document.getElementById('sec-' + id);
+        if (sec) sec.classList.toggle('collapsed', !!s[id]);
+      });
+    }
+    function updateSectionSummaries() {
+      const cnt = arr => arr.filter(x => getEntries(x.key).length > 0).length;
+      const set = (id, txt) => { const e = document.getElementById('sum-' + id); if (e) e.textContent = txt; };
+      set('exercise', cnt(EXERCISES) + '/' + EXERCISES.length + ' logged');
+      set('cardio', cnt(CARDIO) + '/' + CARDIO.length + ' logged');
+      set('intake', cnt(INTAKE) + ' logged');
+      set('measures', cnt(MEASURES) + ' logged');
+      set('mind', cnt(MIND) + ' logged');
+      set('routines', ROUTINES.filter(r => getField(r.key, false)).length + '/' + ROUTINES.length + ' done');
+      const t = getTimer();
+      set('timer', (t.periods || 0) + ' periods · ' + Math.floor((t.workSeconds || 0) / 60) + 'm');
+    }
+
     function render() {
       document.getElementById('dateDisplay').textContent = formatDate(currentDate);
       renderExercises();
@@ -3821,6 +3908,8 @@
       renderRoutines();
       refreshTimerUI();
       updateSoundBtn();
+      updateSectionSummaries();
+      applyCollapsed();
     }
 
     // ---- Theme: 3-way toggle — Auto (follow OS) → Light → Dark ----
