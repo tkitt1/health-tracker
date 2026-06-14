@@ -9,31 +9,36 @@ const EXERCISES = ['pushups','squats','pullups','dips','deadhang','kettlebell','
 const CARDIO = ['bike','run','walk','swim'];
 
 // --- logic under test (kept identical to index.html) ---
-function makeApi(currentDate, store, journalAm = false) {
-  function dayBounds() {
-    const d = currentDate;
-    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
-    const cut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0, 0).getTime();
-    return { start, cut };
-  }
+function makeApi(currentDate, store, fields = {}) {
+  const dayMs = (h, m) => new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), h || 0, m || 0, 0, 0).getTime();
   const getEntries = key => store[key] || [];
-  function loggedBefore9(key) {
-    const { start, cut } = dayBounds();
+  function hasEntryBetween(key, from, to) {
     return getEntries(key).some(e => {
       const t = +e.t || 0;
-      if (t < start || t >= cut) return false;
+      if (t < from || t >= to) return false;
       const val = (e.v != null && e.v !== '') ? parseFloat(e.v)
         : (parseFloat(e.time) || 0) + (parseFloat(e.dist) || 0);
       return (parseFloat(val) || 0) > 0;
     });
   }
+  const loggedBefore9 = key => hasEntryBetween(key, dayMs(0), dayMs(9));
+  const loggedAfter = (key, h) => hasEntryBetween(key, dayMs(h), dayMs(24));
+  function sleepTimeOk(str) {
+    if (!str) return false;
+    const p = String(str).split(':');
+    const mins = (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+    return mins >= 12 * 60 && mins <= 21 * 60 + 30;
+  }
   function morningAuto() {
     const pool = [...EXERCISES, ...CARDIO];
     const exCount = pool.filter(loggedBefore9).length;
-    // AM journal is a checkbox (no timestamp) -> just must be checked.
-    return exCount >= 2 && loggedBefore9('reading') && loggedBefore9('meditation') && !!journalAm;
+    return exCount >= 2 && loggedBefore9('reading') && loggedBefore9('meditation') && !!fields.journal_am;
   }
-  return { morningAuto, loggedBefore9 };
+  function eveningAuto() {
+    return !!fields.ptt && loggedAfter('meditation', 19) && loggedAfter('reading', 19)
+      && sleepTimeOk(fields.sleep_time) && !!fields.journal_pm && !!fields.prepped_family;
+  }
+  return { morningAuto, eveningAuto, loggedBefore9, loggedAfter, sleepTimeOk };
 }
 
 // timestamp helper: hour:min local on the viewed day
@@ -53,7 +58,7 @@ ok('2 ex/cardio + reading + meditation + AM journal -> complete',
     run: [{ t: at(7, 30), time: 5, dist: 1 }],
     reading: [{ t: at(8), v: 15 }],
     meditation: [{ t: at(8, 30), v: 10 }],
-  }, true).morningAuto(), true);
+  }, { journal_am: true }).morningAuto(), true);
 
 // 1b. Same but AM journal not done -> incomplete.
 ok('all activities but AM journal missing -> incomplete',
@@ -62,7 +67,7 @@ ok('all activities but AM journal missing -> incomplete',
     run: [{ t: at(7, 30), time: 5, dist: 1 }],
     reading: [{ t: at(8), v: 15 }],
     meditation: [{ t: at(8, 30), v: 10 }],
-  }, false).morningAuto(), false);
+  }, {}).morningAuto(), false);
 
 // 2. Only 1 activity before 9am -> incomplete.
 ok('only 1 ex/cardio -> incomplete',
@@ -114,7 +119,39 @@ ok('two cardio items + reading + meditation + AM journal -> complete',
     swim: [{ t: at(7, 30), time: 10, dist: 200 }],
     reading: [{ t: at(8), v: 15 }],
     meditation: [{ t: at(8), v: 10 }],
-  }, true).morningAuto(), true);
+  }, { journal_am: true }).morningAuto(), true);
+
+// --- Evening routine ---
+const eveStore = {
+  meditation: [{ t: at(20), v: 10 }],   // 8pm
+  reading: [{ t: at(21), v: 20 }],      // 9pm
+};
+const eveFields = { ptt: true, journal_pm: true, prepped_family: true, sleep_time: '21:15' };
+
+// 10. All evening conditions met -> complete.
+ok('all evening conditions met -> complete',
+  makeApi(D, eveStore, eveFields).eveningAuto(), true);
+
+// 11. Meditation before 7pm does not count for evening.
+ok('meditation before 7pm -> not counted',
+  makeApi(D, { meditation: [{ t: at(18, 59), v: 10 }] }, {}).loggedAfter('meditation', 19), false);
+ok('meditation at exactly 7pm counts',
+  makeApi(D, { meditation: [{ t: at(19), v: 10 }] }, {}).loggedAfter('meditation', 19), true);
+
+// 12. Sleep time thresholds (<= 21:30 inclusive; past-midnight fails).
+const api = makeApi(D, {}, {});
+ok('sleep 21:30 ok', api.sleepTimeOk('21:30'), true);
+ok('sleep 21:31 not ok', api.sleepTimeOk('21:31'), false);
+ok('sleep 00:30 (after midnight) not ok', api.sleepTimeOk('00:30'), false);
+ok('sleep empty not ok', api.sleepTimeOk(''), false);
+
+// 13. Missing one evening field -> incomplete.
+ok('evening missing PTT -> incomplete',
+  makeApi(D, eveStore, { ...eveFields, ptt: false }).eveningAuto(), false);
+ok('evening missing prepped-for-family -> incomplete',
+  makeApi(D, eveStore, { ...eveFields, prepped_family: false }).eveningAuto(), false);
+ok('evening late bedtime -> incomplete',
+  makeApi(D, eveStore, { ...eveFields, sleep_time: '22:00' }).eveningAuto(), false);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

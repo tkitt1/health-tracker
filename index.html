@@ -2515,31 +2515,75 @@
             </label>
           </div>
           <button class="journal-open-btn" onclick="openJournalApp()" title="Open Apple Journal (iPhone/iPad, or Mac if installed)">📓 Open Journal app</button>
+        </div>
+        <div class="mind-card">
+          <div class="card-header">
+            <span class="card-icon">🌙</span>
+            <span class="card-label">Evening Prep</span>
+          </div>
+          <div class="journal-checks">
+            <label class="journal-check">
+              <input type="checkbox" id="pttCheck" onchange="saveField('ptt', this.checked)">
+              <span>🗂 PTT — Planned Tomorrow Today</span>
+            </label>
+            <label class="journal-check">
+              <input type="checkbox" id="familyCheck" onchange="saveField('prepped_family', this.checked)">
+              <span>👨‍👩‍👧 Prepped for family</span>
+            </label>
+          </div>
+        </div>
+        <div class="mind-card">
+          <div class="card-header">
+            <span class="card-icon">🛏️</span>
+            <span class="card-label">Sleep time</span>
+          </div>
+          <div class="add-row">
+            <input type="time" id="sleepTimeInput" onchange="saveField('sleep_time', this.value); render();">
+          </div>
+          <div class="if-meta" style="margin-top:8px">Goal: in bed by 9:30pm</div>
         </div>`;
       const amEl = document.getElementById('journalAm');
       const pmEl = document.getElementById('journalPm');
       if (amEl) amEl.checked = !!getField('journal_am', false);
       if (pmEl) pmEl.checked = !!getField('journal_pm', false);
+      const pttEl = document.getElementById('pttCheck');
+      const famEl = document.getElementById('familyCheck');
+      const sleepEl = document.getElementById('sleepTimeInput');
+      if (pttEl) pttEl.checked = !!getField('ptt', false);
+      if (famEl) famEl.checked = !!getField('prepped_family', false);
+      if (sleepEl) sleepEl.value = getField('sleep_time', '');
     }
 
-    // ---- Routines (auto-computed daily summaries with per-day manual override) ----
-    // Window for the day being viewed: [midnight, 9am) local.
-    function dayBounds() {
+    // ---- Routines (manual completion; checklist auto-evaluates as a live guide) ----
+    // Local epoch ms for h:m on the viewed day (dayMs(24) = next midnight).
+    function dayMs(h, m) {
       const d = currentDate;
-      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
-      const cut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0, 0).getTime();
-      return { start, cut };
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h || 0, m || 0, 0, 0).getTime();
     }
-    // Did `key` get a real entry (value > 0) timestamped before 9am on the viewed day?
-    function loggedBefore9(key) {
-      const { start, cut } = dayBounds();
+    // Does `key` have a real entry (value > 0) timestamped within [from, to)?
+    function hasEntryBetween(key, from, to) {
       return getEntries(key).some(e => {
         const t = +e.t || 0;
-        if (t < start || t >= cut) return false; // outside 00:00–09:00 (also excludes legacy t=0)
+        if (t < from || t >= to) return false; // also excludes legacy t=0
         const val = (e.v != null && e.v !== '') ? parseFloat(e.v)
           : (parseFloat(e.time) || 0) + (parseFloat(e.dist) || 0); // cardio: time or distance
         return (parseFloat(val) || 0) > 0;
       });
+    }
+    const loggedBefore9 = key => hasEntryBetween(key, dayMs(0), dayMs(9));    // 00:00–08:59
+    const loggedAfter = (key, h) => hasEntryBetween(key, dayMs(h), dayMs(24)); // h:00–23:59
+    // Bedtime "HH:MM" is by 9:30pm (noon–21:30 window so a past-midnight time fails).
+    function sleepTimeOk(str) {
+      if (!str) return false;
+      const p = String(str).split(':');
+      const mins = (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+      return mins >= 12 * 60 && mins <= 21 * 60 + 30;
+    }
+    function fmtClockHM(str) {
+      const p = String(str).split(':'); if (p.length < 2) return str;
+      const h = parseInt(p[0], 10) || 0, ap = h >= 12 ? 'PM' : 'AM';
+      let hh = h % 12; if (hh === 0) hh = 12;
+      return hh + ':' + p[1] + ' ' + ap;
     }
     function morningStatus() {
       const pool = [...EXERCISES, ...CARDIO].map(x => x.key);
@@ -2557,9 +2601,25 @@
         ],
       };
     }
-    // Conditions to be provided — stubbed until then.
     function eveningStatus() {
-      return { auto: false, checks: [{ label: 'Conditions not set yet', met: false }] };
+      const ptt = !!getField('ptt', false);
+      const eveMed = loggedAfter('meditation', 19);
+      const eveRead = loggedAfter('reading', 19);
+      const sleepStr = getField('sleep_time', '');
+      const sleepOk = sleepTimeOk(sleepStr);
+      const pmJournal = !!getField('journal_pm', false);
+      const family = !!getField('prepped_family', false);
+      return {
+        auto: ptt && eveMed && eveRead && sleepOk && pmJournal && family,
+        checks: [
+          { label: 'PTT — Planned Tomorrow Today', met: ptt },
+          { label: 'Meditation after 7pm', met: eveMed },
+          { label: 'Reading after 7pm', met: eveRead },
+          { label: 'Sleep time by 9:30pm', met: sleepOk, detail: sleepStr ? fmtClockHM(sleepStr) : null },
+          { label: 'PM journal done', met: pmJournal },
+          { label: 'Prepped for family', met: family },
+        ],
+      };
     }
 
     const routineExpanded = {}; // per-card open/closed state (ephemeral, survives re-renders)
