@@ -2137,6 +2137,9 @@
       arr.push(entry);
       setEntries(key, arr);
       render();
+      // Keep the cursor in the same input (now cleared) so you can log again without re-tapping.
+      const again = document.getElementById(key + '_in');
+      if (again) again.focus();
     }
 
     // Edit the timestamp of the most recent entry (e.g. last coffee)
