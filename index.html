@@ -256,6 +256,7 @@
       gap: 12px;
     }
     .intake-grid.collapsed .intake-extra { display: none; }
+    .card-grid.collapsed .card-extra { display: none; } /* Exercise: hide rows past the first until "Show more" */
     .intake-more {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -1331,7 +1332,7 @@
         <span class="section-summary" id="sum-exercise"></span>
         <span class="section-chevron">▾</span>
       </div>
-      <div class="card-grid" id="exerciseGrid"></div>
+      <div id="exerciseSection"></div>
     </div>
 
 
@@ -2239,15 +2240,20 @@
       render();
     }
 
-    // Exercise (field entry)
+    // Exercise (field entry) — show the first row (4 cards) by default; the rest behind "Show more".
+    const EXERCISE_DEFAULT_COUNT = 4;
+    let exercisesExpanded = false;
+    function toggleExercisesMore() { exercisesExpanded = !exercisesExpanded; renderExercises(); }
+
     function renderExercises() {
-      const grid = document.getElementById('exerciseGrid');
-      grid.innerHTML = EXERCISES.map(ex => {
+      const section = document.getElementById('exerciseSection');
+      const cards = EXERCISES.map((ex, i) => {
         const unit = ex.unit || 'reps';
         const total = sumEntries(ex.key);
         const n = getEntries(ex.key).length;
+        const extra = i >= EXERCISE_DEFAULT_COUNT;
         return `
-          <div class="card">
+          <div class="card${extra ? ' card-extra' : ''}">
             <div class="card-header">
               <span class="card-icon">${ex.icon}</span>
               <span class="card-label">${ex.label}</span>
@@ -2263,6 +2269,11 @@
             </div>
           </div>`;
       }).join('');
+      const extraCount = EXERCISES.length - EXERCISE_DEFAULT_COUNT;
+      const moreBtn = extraCount > 0
+        ? `<button class="intake-more" onclick="toggleExercisesMore()">${exercisesExpanded ? 'Show less' : 'Show more (' + extraCount + ')'}</button>`
+        : '';
+      section.innerHTML = `<div class="card-grid${exercisesExpanded ? '' : ' collapsed'}" id="exerciseGrid">${cards}</div>${moreBtn}`;
     }
 
     // Cardio (field entry, km)
