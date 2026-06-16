@@ -2188,12 +2188,19 @@
       const arr = getEntries(key);
       arr.push(entry);
       setEntries(key, arr);
-      // Update in place (don't rebuild the card) so the input keeps focus and the
-      // mobile keyboard stays up — you can log rep after rep without re-tapping.
       el.value = '';
       if (itemEl) itemEl.value = '';
       const tv = document.getElementById('tv_' + key);
-      if (tv) tv.textContent = sumEntries(key);
+      if (!tv) {
+        // Cards without an in-place total (e.g. Measures show the latest reading,
+        // not a running sum, and have no tv_/el_ ids) need a full re-render so the
+        // new value shows immediately instead of only after a page reload.
+        render();
+        return;
+      }
+      // Update in place (don't rebuild the card) so the input keeps focus and the
+      // mobile keyboard stays up — you can log rep after rep without re-tapping.
+      tv.textContent = sumEntries(key);
       const elk = document.getElementById('el_' + key);
       if (elk) elk.textContent = 'edit (' + arr.length + ')';
       renderRoutines(); // reading/meditation feed the routine checklist
