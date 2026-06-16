@@ -757,6 +757,22 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+    /* Editable "Started" on a past day's timer card */
+    .timer-stat-editable {
+      cursor: pointer;
+      color: var(--accent);
+      border-bottom: 1px dashed var(--accent);
+    }
+    .timer-edit-input {
+      font-family: inherit;
+      font-size: 0.85rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 2px 4px;
+      max-width: 160px;
+    }
 
     .progress-bar {
       width: 100%;
@@ -1724,6 +1740,37 @@
       return JSON.stringify(d);
     }
 
+    // Merge two day-record blobs so neither device's entries are lost. Array fields
+    // (the per-metric entry logs) union by entry id; scalar fields take the newer
+    // blob's value; work_started_at keeps the earliest across devices. Output keys and
+    // entries are sorted so both devices converge to an identical string (no ping-pong).
+    function dayEntryKey(e) { return (e && e.id != null) ? 'id:' + e.id : 'j:' + JSON.stringify(e); }
+    function unionEntries(newerArr, olderArr) {
+      const map = new Map();
+      (olderArr || []).forEach(e => map.set(dayEntryKey(e), e));
+      (newerArr || []).forEach(e => map.set(dayEntryKey(e), e)); // newer wins an id collision
+      return Array.from(map.values()).sort((a, b) => (+a.t || 0) - (+b.t || 0) || String(a && a.id).localeCompare(String(b && b.id)));
+    }
+    function mergeDayRecords(localStr, remoteStr, remoteNewer) {
+      let L = {}, R = {};
+      try { L = JSON.parse(localStr || '{}') || {}; } catch (e) {}
+      try { R = JSON.parse(remoteStr || '{}') || {}; } catch (e) {}
+      const newer = remoteNewer ? R : L, older = remoteNewer ? L : R;
+      const out = {};
+      [...new Set([...Object.keys(L), ...Object.keys(R)])].sort().forEach(k => {
+        const lv = L[k], rv = R[k];
+        if (Array.isArray(lv) || Array.isArray(rv)) {
+          const la = Array.isArray(lv) ? lv : [], ra = Array.isArray(rv) ? rv : [];
+          out[k] = unionEntries(remoteNewer ? ra : la, remoteNewer ? la : ra);
+        } else {
+          out[k] = (newer[k] !== undefined) ? newer[k] : older[k];
+        }
+      });
+      const es = earliestStart(localStr, remoteStr);
+      if (es) out.work_started_at = es;
+      return JSON.stringify(out);
+    }
+
     // Two-way merge: newest write per key wins (by timestamp), except work_started_at
     // on day records, which is preserved as the earliest start across devices.
     async function syncOnLogin() {
@@ -1747,22 +1794,31 @@
         const r = remote[k];
         const lv = localStorage.getItem(k);
         const lts = m[k] || 0;
-        const day = isDayRecord(k);
-        const keepStart = day ? earliestStart(lv, r && r.value) : 0; // earliest work-day start across devices
-        if (r && (lv == null || r.ts >= lts)) {
-          const merged = day ? withStart(r.value, keepStart) : r.value; // remote wins, but never drop an earlier start
-          if (localStorage.getItem(k) !== merged) pulledChange = true;
-          localStorage.setItem(k, merged);
-          m[k] = r.ts;
-          if (day && merged !== r.value) { // we restored a start the cloud was missing — push it so devices converge
+
+        if (isDayRecord(k)) {
+          // A day holds many independent entries; merge by entry id so concurrent edits
+          // from two devices never clobber each other (the old whole-blob newest-wins
+          // dropped the other device's additions — e.g. phone pushups lost to desktop).
+          const remoteNewer = r ? (r.ts >= lts) : false;
+          const merged = mergeDayRecords(lv, r ? r.value : null, remoteNewer);
+          if (localStorage.getItem(k) !== merged) { localStorage.setItem(k, merged); pulledChange = true; }
+          if (!r || merged !== r.value) { // cloud is missing part of the union — push it so devices converge
             const ts = Date.now(); m[k] = ts;
             toPush.push({ user_id: currentUser.id, key: k, value: merged, updated_at: new Date(ts).toISOString() });
+          } else {
+            m[k] = r.ts;
           }
+          return;
+        }
+
+        // Non-day records (e.g. ht_timer, passkey flag): newest write per key wins.
+        if (r && (lv == null || r.ts >= lts)) {
+          if (localStorage.getItem(k) !== r.value) pulledChange = true;
+          localStorage.setItem(k, r.value);
+          m[k] = r.ts;
         } else if (lv != null && (!r || lts > r.ts)) {
-          const merged = day ? withStart(lv, keepStart) : lv; // local wins, but fold in an earlier start the cloud knew
-          if (merged !== lv) { localStorage.setItem(k, merged); pulledChange = true; }
-          const ts = (merged !== lv) ? Date.now() : (lts || Date.now()); m[k] = ts; // local is newer / cloud missing
-          toPush.push({ user_id: currentUser.id, key: k, value: merged, updated_at: new Date(ts).toISOString() });
+          const ts = lts || Date.now(); m[k] = ts;
+          toPush.push({ user_id: currentUser.id, key: k, value: lv, updated_at: new Date(ts).toISOString() });
         }
       });
       metaSet(m);
@@ -3426,6 +3482,33 @@
     }
 
     // Past-day view: render the work recorded for the VIEWED day (static), no live clock.
+    function parseLocalDateTime(value) {
+      if (!value) return null;
+      const ms = new Date(value).getTime();
+      return isNaN(ms) ? null : ms;
+    }
+    // Default the start picker to 9am on the viewed day when nothing is recorded yet.
+    function defaultStartMsForViewedDay() {
+      const d = new Date(currentDate); d.setHours(9, 0, 0, 0); return d.getTime();
+    }
+    // Reveal an inline datetime picker on the past-day "Started" stat.
+    function editPastStart() {
+      const el = document.getElementById('workStartStat');
+      if (!el) return;
+      const cur = getField('work_started_at', 0) || defaultStartMsForViewedDay();
+      el.innerHTML = `<input type="datetime-local" class="timer-edit-input" value="${toLocalInput(cur)}"
+        onchange="setPastStart(this.value)" onblur="refreshTimerUI()">`;
+      const input = el.querySelector('input');
+      if (input) input.focus();
+    }
+    // Write the edited start to the VIEWED day's record (per the spec: edits apply to the day shown).
+    function setPastStart(value) {
+      const ms = parseLocalDateTime(value);
+      if (ms == null) { refreshTimerUI(); return; }
+      saveField('work_started_at', ms);
+      render();
+    }
+
     function renderPastTimerCard() {
       setTimerChrome(false);
       const fmtClock = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -3440,7 +3523,9 @@
         phaseEl.textContent = pastTimerPhaseText(periods, totalMin);
         phaseEl.className = 'timer-phase' + (periods ? ' reached' : '');
       }
-      set('workStartStat', startMs ? fmtClock(startMs) : '—');
+      const startStat = document.getElementById('workStartStat');
+      if (startStat) startStat.innerHTML =
+        `<span class="timer-stat-editable" onclick="editPastStart()" title="Edit start time">${startMs ? fmtClock(startMs) : '+ set'}</span>`;
       set('workEndStat', endMs ? fmtClock(endMs) : '—');
       set('workPeriods', periods);
       set('totalWorkTime', totalMin + 'm');
