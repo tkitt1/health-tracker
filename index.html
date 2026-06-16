@@ -3381,6 +3381,15 @@
       }
     }
 
+    // Build the browser-tab title from the live timer so the tab reads as a
+    // running clock: "24:13 · Work" while running, "24:13 · Paused" when paused,
+    // and the plain app name when idle/ended. Pure (no DOM) so it's unit-testable.
+    function tabTitleFor(s) {
+      if (s.running) return s.timeStr + ' · ' + (s.phase === 'work' ? 'Work' : 'Break');
+      if (s.started) return s.timeStr + ' · Paused';
+      return 'My Performance Tracker';
+    }
+
     function refreshTimerUI(t) {
       t = t || getTimer();
       const remaining = timerRemainingSec(t);
@@ -3430,6 +3439,9 @@
         if (t.running) { startBtn.textContent = 'Start'; startBtn.disabled = true; pauseBtn.disabled = false; }
         else { startBtn.textContent = t.started ? 'Resume' : 'Start'; startBtn.disabled = false; pauseBtn.disabled = true; }
       }
+
+      // Mirror the live timer into the browser-tab title (running clock).
+      document.title = tabTitleFor({ running: t.running, started: t.started, phase: t.phase, timeStr: formatTime(remaining) });
     }
 
     function startTimer() {
