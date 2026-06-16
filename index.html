@@ -157,9 +157,16 @@
       color: var(--accent);
       min-width: 110px;
       text-align: center;
-      cursor: pointer;
     }
-    .date-nav .date-display:hover { text-decoration: underline; }
+    /* Dedicated "Today" jump button (pill); shown only when viewing another day. */
+    .date-nav .today-btn {
+      width: auto;
+      padding: 0 14px;
+      border-radius: 18px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
 
     .section {
       margin-bottom: 24px;
@@ -1310,8 +1317,9 @@
       </div>
       <div class="date-nav">
         <button onclick="changeDate(-1)">&#8249;</button>
-        <span class="date-display" id="dateDisplay" onclick="goToToday()" title="Back to today"></span>
+        <span class="date-display" id="dateDisplay"></span>
         <button onclick="changeDate(1)">&#8250;</button>
+        <button class="today-btn" id="todayBtn" onclick="goToToday()" title="Back to today" style="display:none">Today</button>
         <button onclick="openCalendar()" title="Pick a date">📅</button>
       </div>
     </header>
@@ -3925,6 +3933,8 @@
 
     function render() {
       document.getElementById('dateDisplay').textContent = formatDate(currentDate);
+      const todayBtn = document.getElementById('todayBtn');
+      if (todayBtn) todayBtn.style.display = isToday() ? 'none' : '';
       renderExercises();
       renderCardio();
       renderIntake();
