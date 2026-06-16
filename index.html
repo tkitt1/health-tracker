@@ -3398,9 +3398,52 @@
       return 'My Performance Tracker';
     }
 
+    // Show/hide the live-only timer chrome (controls, progress bar, edit-periods link).
+    function setTimerChrome(showLive) {
+      const card = document.querySelector('#sec-timer .timer-card');
+      if (!card) return;
+      ['.timer-controls', '.progress-bar', '.var-manage'].forEach(sel => {
+        const el = card.querySelector(sel);
+        if (el) el.style.display = showLive ? '' : 'none';
+      });
+    }
+
+    function pastTimerPhaseText(periods, totalMin) {
+      return periods
+        ? `✓ ${periods} work period${periods === 1 ? '' : 's'} · ${totalMin}m`
+        : 'No work logged this day';
+    }
+
+    // Past-day view: render the work recorded for the VIEWED day (static), no live clock.
+    function renderPastTimerCard() {
+      setTimerChrome(false);
+      const fmtClock = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const periods = getField('timer_periods', 0) || 0;
+      const totalMin = Math.floor((getField('timer_total_work', 0) || 0) / 60);
+      const startMs = getField('work_started_at', 0);
+      const endMs = getField('work_ended_at', 0);
+      const set = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+      set('timerDisplay', '—');
+      const phaseEl = document.getElementById('timerPhase');
+      if (phaseEl) {
+        phaseEl.textContent = pastTimerPhaseText(periods, totalMin);
+        phaseEl.className = 'timer-phase' + (periods ? ' reached' : '');
+      }
+      set('workStartStat', startMs ? fmtClock(startMs) : '—');
+      set('workEndStat', endMs ? fmtClock(endMs) : '—');
+      set('workPeriods', periods);
+      set('totalWorkTime', totalMin + 'm');
+      set('cycleCount', '—'); // "Until Long Break" is a live-only concept
+    }
+
     function refreshTimerUI(t) {
       t = t || getTimer();
       const remaining = timerRemainingSec(t);
+      // Tab title always mirrors the real (today's) timer, even while viewing a past day.
+      document.title = tabTitleFor({ running: t.running, started: t.started, phase: t.phase, timeStr: formatTime(remaining) });
+      // Viewing a past day: show only that day's recorded work — no live clock or controls.
+      if (!isToday()) { renderPastTimerCard(); return; }
+      setTimerChrome(true); // back on today: restore the live controls/progress
       const total = phaseDur(t.phase);
       let label, cls;
       if (t.phase === 'work') { label = 'Work Period'; cls = 'work'; }
@@ -3447,9 +3490,6 @@
         if (t.running) { startBtn.textContent = 'Start'; startBtn.disabled = true; pauseBtn.disabled = false; }
         else { startBtn.textContent = t.started ? 'Resume' : 'Start'; startBtn.disabled = false; pauseBtn.disabled = true; }
       }
-
-      // Mirror the live timer into the browser-tab title (running clock).
-      document.title = tabTitleFor({ running: t.running, started: t.started, phase: t.phase, timeStr: formatTime(remaining) });
     }
 
     function startTimer() {
@@ -3927,8 +3967,15 @@
       set('measures', cnt(MEASURES) + ' logged');
       set('mind', cnt(MIND) + ' logged');
       set('routines', ROUTINES.filter(r => getField(r.key, false)).length + '/' + ROUTINES.length + ' done');
-      const t = getTimer();
-      set('timer', (t.periods || 0) + ' periods · ' + Math.floor((t.workSeconds || 0) / 60) + 'm');
+      // Timer summary follows the viewed day: live counters today, recorded values on past days.
+      if (isToday()) {
+        const t = getTimer();
+        set('timer', (t.periods || 0) + ' periods · ' + Math.floor((t.workSeconds || 0) / 60) + 'm');
+      } else {
+        const p = getField('timer_periods', 0) || 0;
+        const m = Math.floor((getField('timer_total_work', 0) || 0) / 60);
+        set('timer', p + ' periods · ' + m + 'm');
+      }
     }
 
     function render() {
