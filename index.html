@@ -218,6 +218,13 @@
     }
     .scan-btn:hover { background: var(--accent); color: #fff; }
     .scan-btn:disabled { opacity: 0.6; cursor: default; }
+    /* Desktop: park "Scan label" at the far right next to the collapse chevron.
+       The button keeps margin-left:auto; dropping the chevron's auto margin here
+       leaves a single auto margin so the button+chevron group sits flush right.
+       (Mobile keeps the default centered placement.) */
+    @media (min-width: 641px) {
+      #sec-intake .section-chevron { margin-left: 8px; }
+    }
     .scan-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .scan-name { flex: 1; font-size: 0.9rem; }
     .scan-in {
