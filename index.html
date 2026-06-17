@@ -2749,6 +2749,11 @@
     }
     const loggedBefore9 = key => hasEntryBetween(key, dayMs(0), dayMs(9));    // 00:00–08:59
     const loggedAfter = (key, h) => hasEntryBetween(key, dayMs(h), dayMs(24)); // h:00–23:59
+    // A single cardio session (one entry) of at least `mins` minutes before 9am.
+    const cardioSessionBefore9 = (key, mins) => getEntries(key).some(e => {
+      const t = +e.t || 0;
+      return t >= dayMs(0) && t < dayMs(9) && (parseFloat(e.time) || 0) >= mins;
+    });
     // Bedtime "HH:MM" is by 9:30pm (noon–21:30 window so a past-midnight time fails).
     function sleepTimeOk(str) {
       if (!str) return false;
@@ -2763,15 +2768,17 @@
       return hh + ':' + p[1] + ' ' + ap;
     }
     function morningStatus() {
-      const pool = [...EXERCISES, ...CARDIO].map(x => x.key);
-      const exCount = pool.filter(loggedBefore9).length;
+      // Exercise requirement: a single 10min+ cardio session OR 2+ strength exercises, each before 9am.
+      const strengthCount = EXERCISES.filter(x => loggedBefore9(x.key)).length;
+      const cardio10 = CARDIO.some(c => cardioSessionBefore9(c.key, 10));
+      const exerciseReq = cardio10 || strengthCount >= 2;
       const reading = loggedBefore9('reading');
       const meditation = loggedBefore9('meditation');
       const amJournal = !!getField('journal_am', false); // checkbox (no timestamp -> no 9am check)
       return {
-        auto: exCount >= 2 && reading && meditation && amJournal,
+        auto: exerciseReq && reading && meditation && amJournal,
         checks: [
-          { label: '2+ exercise/cardio before 9am', met: exCount >= 2, detail: `${Math.min(exCount, 2)}/2` },
+          { label: '10min+ cardio or 2+ exercises before 9am', met: exerciseReq, detail: cardio10 ? 'cardio 10m+' : `${Math.min(strengthCount, 2)}/2 ex` },
           { label: 'Reading before 9am', met: reading },
           { label: 'Meditation before 9am', met: meditation },
           { label: 'AM journal done', met: amJournal },
