@@ -1073,6 +1073,17 @@
     .mind-card .card-header {
       margin-bottom: 8px;
     }
+    /* Collapsible Mind cards (Mood, NOPNOM): header-only by default, tap to expand. */
+    .mind-collapsible .card-header { margin-bottom: 0; cursor: pointer; user-select: none; }
+    .mind-collapsible .collapsible-body { display: none; margin-top: 12px; }
+    .mind-collapsible.expanded .collapsible-body { display: block; }
+    .mind-current { font-size: 0.72rem; color: var(--text-muted); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mind-chevron { color: var(--text-muted); font-size: 0.7rem; transition: transform 0.15s; margin-left: 10px; flex: none; }
+    .mind-collapsible.expanded .mind-chevron { transform: rotate(90deg); }
+    .mood-select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 10px; font-size: 0.9rem; font-family: inherit; cursor: pointer;
+    }
 
     .mind-input {
       display: flex;
@@ -1614,7 +1625,6 @@
       { key: 'sleep', label: 'Sleep Score', icon: '😴' },
       { key: 'bodyfat', label: 'Body Fat', icon: '📊' },
       { key: 'bp', label: 'Blood Pressure', icon: '🩸' },
-      { key: 'mood', label: 'Mood', icon: '🧠' },
     ];
 
     // Mood is a timestamped log (like other entries): each tap records v=mood.
@@ -1624,7 +1634,22 @@
       { v: 'angry', label: 'Angry', icon: '😠' },
       { v: 'sad', label: 'Sad', icon: '😢' },
     ];
-    const moodMeta = v => MOOD_OPTIONS.find(o => o.v === v) || { v, label: v, icon: '🧠' };
+    // Custom emotions are appended by the user and persisted/synced (a small global list).
+    function getCustomMoods() { try { const a = JSON.parse(localStorage.getItem('ht_custom_moods') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function allMoodOptions() { return [...MOOD_OPTIONS, ...getCustomMoods()]; }
+    const moodMeta = v => allMoodOptions().find(o => o.v === v) || { v, label: v, icon: '🧠' };
+    // Add a custom emotion (prompted), persist it, and return its value so it can be logged.
+    function addCustomMood() {
+      const name = (window.prompt('New emotion (you can include an emoji):') || '').trim();
+      if (!name) return null;
+      const v = 'c_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const list = getCustomMoods();
+      const existing = allMoodOptions().find(o => o.label.toLowerCase() === name.toLowerCase());
+      if (existing) return existing.v;
+      list.push({ v, label: name, icon: '🙂' });
+      persist('ht_custom_moods', JSON.stringify(list));
+      return v;
+    }
 
     const CARDIO = [
       { key: 'bike', label: 'Bike', icon: '🚴', distUnit: 'km', distStep: '0.1', speedUnit: 'km/h' },
@@ -2253,6 +2278,7 @@
     }
 
     function metaFor(key) {
+      if (key === 'mood') return { key: 'mood', label: 'Mood', icon: '🧠' }; // lives in Mind now, kept here for the entry log
       return [...EXERCISES, ...CARDIO, ...INTAKE, ...MIND, ...MEASURES].find(m => m.key === key) || { label: key, icon: '' };
     }
 
@@ -2660,8 +2686,25 @@
     }
 
     // Mind (field entry)
+    // Mood & NOPNOM collapse state (ephemeral — collapsed again on reload).
+    const mindExpanded = {};
+    function toggleMindExpand(key) { mindExpanded[key] = !mindExpanded[key]; renderMind(); }
+    function onMoodSelect(v) {
+      if (!v) return;
+      if (v === '__add__') { const nv = addCustomMood(); if (nv) { mindExpanded.mood = true; logMood(nv); } else renderMind(); return; }
+      logMood(v);
+    }
+
     function renderMind() {
       const grid = document.getElementById('mindGrid');
+      const moodArr = getEntries('mood');
+      const lastMood = moodArr[moodArr.length - 1];
+      const lastMoodTxt = lastMood
+        ? `${moodMeta(lastMood.v).icon} ${moodMeta(lastMood.v).label} · ${new Date(lastMood.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+        : '—';
+      const nopVal = getField('nopnom', '');
+      const nopTxt = nopVal === 'yes' ? 'Yes' : nopVal === 'no' ? 'No' : '—';
+      const moodExp = !!mindExpanded.mood, nopExp = !!mindExpanded.nopnom;
       grid.innerHTML = MIND.map(m => {
         const total = sumEntries(m.key);
         const n = getEntries(m.key).length;
@@ -2725,20 +2768,38 @@
           </div>
           <div class="if-meta" style="margin-top:8px">Goal: in bed by 9:30pm</div>
         </div>
-        <div class="mind-card">
-          <div class="card-header">
+        <div class="mind-card mind-collapsible${nopExp ? ' expanded' : ''}">
+          <div class="card-header" onclick="toggleMindExpand('nopnom')" title="Tap to expand">
             <span class="card-icon">🔘</span>
             <span class="card-label">NOPNOM</span>
+            <span class="mind-current">${nopTxt}</span>
+            <span class="mind-chevron">▸</span>
           </div>
-          <div class="journal-checks">
+          <div class="collapsible-body journal-checks">
             <label class="journal-check">
-              <input type="radio" name="nopnom" value="yes" id="nopnomYes" onchange="saveField('nopnom', 'yes')">
+              <input type="radio" name="nopnom" value="yes" id="nopnomYes" onchange="saveField('nopnom', 'yes'); renderMind()">
               <span>Yes</span>
             </label>
             <label class="journal-check">
-              <input type="radio" name="nopnom" value="no" id="nopnomNo" onchange="saveField('nopnom', 'no')">
+              <input type="radio" name="nopnom" value="no" id="nopnomNo" onchange="saveField('nopnom', 'no'); renderMind()">
               <span>No</span>
             </label>
+          </div>
+        </div>
+        <div class="mind-card mind-collapsible${moodExp ? ' expanded' : ''}">
+          <div class="card-header" onclick="toggleMindExpand('mood')" title="Tap to expand">
+            <span class="card-icon">🧠</span>
+            <span class="card-label">Mood</span>
+            <span class="mind-current">${lastMoodTxt}</span>
+            <span class="mind-chevron">▸</span>
+          </div>
+          <div class="collapsible-body">
+            <select class="mood-select" onchange="onMoodSelect(this.value)">
+              <option value="">Log a mood…</option>
+              ${allMoodOptions().map(o => `<option value="${o.v}">${o.icon || '🙂'} ${o.label}</option>`).join('')}
+              <option value="__add__">➕ Add emotion…</option>
+            </select>
+            <div style="margin-top:8px"><span class="view-link" style="margin-left:0" onclick="openEntries('mood','mood')">edit${moodArr.length ? ` (${moodArr.length})` : ''}</span></div>
           </div>
         </div>`;
       const amEl = document.getElementById('journalAm');
@@ -2928,28 +2989,7 @@
           </div>
         </div>`;
 
-      const moodArr = getEntries('mood');
-      const lastMood = moodArr[moodArr.length - 1];
-      const lastTxt = lastMood
-        ? `${moodMeta(lastMood.v).icon} ${moodMeta(lastMood.v).label} · ${new Date(lastMood.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-        : '';
-      html += `
-        <div class="card mood-card-full">
-          <div class="card-header">
-            <span class="card-icon">🧠</span>
-            <span class="card-label">Mood</span>
-            ${lastMood ? `<span class="mood-last">${lastTxt}</span>` : ''}
-            <span class="view-link" onclick="openEntries('mood','mood')">edit${moodArr.length ? ` (${moodArr.length})` : ''}</span>
-          </div>
-          <div class="mood-options">
-            ${MOOD_OPTIONS.map(o => `
-              <button type="button" class="mood-option" onclick="logMood('${o.v}')">
-                <span class="mood-emoji">${o.icon}</span>
-                <span class="mood-text">${o.label}</span>
-              </button>`).join('')}
-          </div>
-        </div>`;
-      section.innerHTML = html;
+      section.innerHTML = html; // Mood moved to the Mind section
     }
 
     // Record the moment's mood as a timestamped entry (accumulates; never "stuck").
@@ -3228,7 +3268,7 @@
           return `<div class="entry-row">
             <span class="entry-time">${t}</span>
             <select class="entry-var-select" onchange="updateEntryText('${e.id}','v',this.value)">
-              ${MOOD_OPTIONS.map(o => `<option value="${o.v}"${e.v === o.v ? ' selected' : ''}>${o.icon} ${o.label}</option>`).join('')}
+              ${allMoodOptions().map(o => `<option value="${o.v}"${e.v === o.v ? ' selected' : ''}>${o.icon || '🙂'} ${o.label}</option>`).join('')}
             </select>
             <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
           </div>`;
