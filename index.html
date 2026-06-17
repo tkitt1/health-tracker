@@ -3520,6 +3520,15 @@
       });
     }
 
+    // After End Day the live counters reset for the next session; show the day's
+    // final values (endedPeriods + recorded total) while it reads as "ended".
+    function displayTimerStats(t, recordedSec, recordedPeriods, liveSec) {
+      const ended = t.dayEnded && !t.running && !t.started;
+      return ended
+        ? { periods: t.endedPeriods || recordedPeriods || 0, workSec: recordedSec || 0 }
+        : { periods: t.periods || 0, workSec: liveSec };
+    }
+
     function pastTimerPhaseText(periods, totalMin) {
       return periods
         ? `✓ ${periods} work period${periods === 1 ? '' : 's'} · ${totalMin}m`
@@ -3620,9 +3629,12 @@
       const weEl = document.getElementById('workEndStat');
       if (weEl) weEl.textContent = endMs ? fmtClock(endMs) : '—';
 
-      const wpEl = document.getElementById('workPeriods'); if (wpEl) wpEl.textContent = t.periods || 0;
+      // After End Day the live counters are zeroed for the next session, so show the
+      // day's final values (endedPeriods + recorded total) instead of 0.
       const liveWork = (t.workSeconds || 0) + (t.phase === 'work' ? (total - remaining) : 0);
-      const twEl = document.getElementById('totalWorkTime'); if (twEl) twEl.textContent = fmtHM(Math.floor(liveWork / 60));
+      const stats = displayTimerStats(t, getTodayField('timer_total_work', 0), getTodayField('timer_periods', 0), liveWork);
+      const wpEl = document.getElementById('workPeriods'); if (wpEl) wpEl.textContent = stats.periods;
+      const twEl = document.getElementById('totalWorkTime'); if (twEl) twEl.textContent = fmtHM(Math.floor(stats.workSec / 60));
       const ccEl = document.getElementById('cycleCount'); if (ccEl) ccEl.textContent = ((t.periods || 0) % PERIODS_BEFORE_LONG) + ' / ' + PERIODS_BEFORE_LONG;
 
       const startBtn = document.getElementById('timerStartBtn');
@@ -4111,7 +4123,8 @@
       // Timer summary follows the viewed day: live counters today, recorded values on past days.
       if (isToday()) {
         const t = getTimer();
-        set('timer', (t.periods || 0) + ' periods · ' + Math.floor((t.workSeconds || 0) / 60) + 'm');
+        const s = displayTimerStats(t, getTodayField('timer_total_work', 0), getTodayField('timer_periods', 0), t.workSeconds || 0);
+        set('timer', s.periods + ' periods · ' + Math.floor(s.workSec / 60) + 'm');
       } else {
         const p = getField('timer_periods', 0) || 0;
         const m = Math.floor((getField('timer_total_work', 0) || 0) / 60);
