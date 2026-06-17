@@ -1672,6 +1672,7 @@
     const MIND = [
       { key: 'meditation', label: 'Meditation', icon: '🧘' },
       { key: 'reading', label: 'Reading', icon: '📖' },
+      { key: 'nap', label: 'Nap Time', icon: '💤' },
     ];
 
     const ROUTINES = [
@@ -2723,6 +2724,22 @@
             <input type="time" id="sleepTimeInput" onchange="saveField('sleep_time', this.value); render();">
           </div>
           <div class="if-meta" style="margin-top:8px">Goal: in bed by 9:30pm</div>
+        </div>
+        <div class="mind-card">
+          <div class="card-header">
+            <span class="card-icon">🔘</span>
+            <span class="card-label">NOPNOM</span>
+          </div>
+          <div class="journal-checks">
+            <label class="journal-check">
+              <input type="radio" name="nopnom" value="yes" id="nopnomYes" onchange="saveField('nopnom', 'yes')">
+              <span>Yes</span>
+            </label>
+            <label class="journal-check">
+              <input type="radio" name="nopnom" value="no" id="nopnomNo" onchange="saveField('nopnom', 'no')">
+              <span>No</span>
+            </label>
+          </div>
         </div>`;
       const amEl = document.getElementById('journalAm');
       const pmEl = document.getElementById('journalPm');
@@ -2734,6 +2751,9 @@
       if (pttEl) pttEl.checked = !!getField('ptt', false);
       if (famEl) famEl.checked = !!getField('prepped_family', false);
       if (sleepEl) sleepEl.value = getField('sleep_time', '');
+      const nop = getField('nopnom', ''); // '' = unset (neither selected)
+      const nopY = document.getElementById('nopnomYes'); if (nopY) nopY.checked = (nop === 'yes');
+      const nopN = document.getElementById('nopnomNo'); if (nopN) nopN.checked = (nop === 'no');
     }
 
     // ---- Routines (manual completion; checklist auto-evaluates as a live guide) ----
