@@ -1399,7 +1399,7 @@
             <div class="timer-stat-label">Work Periods</div>
           </div>
           <div class="timer-stat">
-            <div class="timer-stat-value" id="totalWorkTime">0m</div>
+            <div class="timer-stat-value" id="totalWorkTime">0h 0m</div>
             <div class="timer-stat-label">Total Work</div>
           </div>
           <div class="timer-stat">
@@ -2077,6 +2077,11 @@
     function fmtMMSS(mins) {
       const total = Math.round((parseFloat(mins) || 0) * 60);
       return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+    // Whole minutes -> "Hh Mm" (always shows the hour part, e.g. "0h 35m", "3h 34m").
+    function fmtHM(totalMin) {
+      const t = Math.max(0, Math.floor(totalMin) || 0);
+      return Math.floor(t / 60) + 'h ' + (t % 60) + 'm';
     }
 
     function dateKey(d) {
@@ -3535,7 +3540,7 @@
         `<span class="timer-stat-editable" onclick="editPastStart()" title="Edit start time">${startMs ? fmtClock(startMs) : '+ set'}</span>`;
       set('workEndStat', endMs ? fmtClock(endMs) : '—');
       set('workPeriods', periods);
-      set('totalWorkTime', totalMin + 'm');
+      set('totalWorkTime', fmtHM(totalMin));
       set('cycleCount', '—'); // "Until Long Break" is a live-only concept
     }
 
@@ -3584,7 +3589,7 @@
 
       const wpEl = document.getElementById('workPeriods'); if (wpEl) wpEl.textContent = t.periods || 0;
       const liveWork = (t.workSeconds || 0) + (t.phase === 'work' ? (total - remaining) : 0);
-      const twEl = document.getElementById('totalWorkTime'); if (twEl) twEl.textContent = Math.floor(liveWork / 60) + 'm';
+      const twEl = document.getElementById('totalWorkTime'); if (twEl) twEl.textContent = fmtHM(Math.floor(liveWork / 60));
       const ccEl = document.getElementById('cycleCount'); if (ccEl) ccEl.textContent = ((t.periods || 0) % PERIODS_BEFORE_LONG) + ' / ' + PERIODS_BEFORE_LONG;
 
       const startBtn = document.getElementById('timerStartBtn');
