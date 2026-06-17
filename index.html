@@ -2072,6 +2072,16 @@
       const t = Math.max(0, Math.floor(totalMin) || 0);
       return Math.floor(t / 60) + 'h ' + (t % 60) + 'm';
     }
+    // Escape user-entered text before interpolating it into innerHTML (prevents XSS
+    // from free-text fields: custom mood labels, "what you ate", variations, notes).
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     function dateKey(d) {
       const dt = d || currentDate;
@@ -2663,7 +2673,7 @@
       const moodArr = getEntries('mood');
       const lastMood = moodArr[moodArr.length - 1];
       const lastMoodTxt = lastMood
-        ? `${moodMeta(lastMood.v).icon} ${moodMeta(lastMood.v).label} · ${new Date(lastMood.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+        ? `${moodMeta(lastMood.v).icon} ${escapeHtml(moodMeta(lastMood.v).label)} · ${new Date(lastMood.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
         : '—';
       const nopVal = getField('nopnom', '');
       const nopTxt = nopVal === 'yes' ? 'Yes' : nopVal === 'no' ? 'No' : '—';
@@ -2759,7 +2769,7 @@
           <div class="collapsible-body">
             <select class="mood-select" onchange="onMoodSelect(this.value)">
               <option value="">Log a mood…</option>
-              ${allMoodOptions().map(o => `<option value="${o.v}">${o.icon || '🙂'} ${o.label}</option>`).join('')}
+              ${allMoodOptions().map(o => `<option value="${o.v}">${o.icon || '🙂'} ${escapeHtml(o.label)}</option>`).join('')}
               <option value="__add__">➕ Add emotion…</option>
             </select>
             <div style="margin-top:8px"><span class="view-link" style="margin-left:0" onclick="openEntries('mood','mood')">edit${moodArr.length ? ` (${moodArr.length})` : ''}</span></div>
@@ -3199,7 +3209,7 @@
         const varInput = hasVar ? buildVariationSelect(e) : '';
         const noteInput = hasVar
           ? `<input type="text" class="entry-note-input" placeholder="details"
-               value="${(e.note || '').replace(/"/g, '&quot;')}"
+               value="${escapeHtml(e.note || '')}"
                onchange="updateEntryText('${e.id}','note',this.value)">`
           : '';
         if (modalType === 'cardio') {
@@ -3231,14 +3241,14 @@
           return `<div class="entry-row">
             <span class="entry-time">${t}</span>
             <select class="entry-var-select" onchange="updateEntryText('${e.id}','v',this.value)">
-              ${allMoodOptions().map(o => `<option value="${o.v}"${e.v === o.v ? ' selected' : ''}>${o.icon || '🙂'} ${o.label}</option>`).join('')}
+              ${allMoodOptions().map(o => `<option value="${o.v}"${e.v === o.v ? ' selected' : ''}>${o.icon || '🙂'} ${escapeHtml(o.label)}</option>`).join('')}
             </select>
             <button class="entry-del" onclick="deleteEntry('${e.id}')">×</button>
           </div>`;
         }
         const itemInput = withItem
           ? `<input type="text" class="entry-item-input" placeholder="what you ate"
-               value="${(e.item || '').replace(/"/g, '&quot;')}"
+               value="${escapeHtml(e.item || '')}"
                onchange="updateEntryText('${e.id}','item',this.value)">`
           : '';
         return `<div class="entry-row">
@@ -3283,7 +3293,7 @@
       const opts = getVariations(modalKey);
       if (!opts.some(x => x === cur)) opts.unshift(cur); // ensure current value is selectable
       return `<select class="entry-var-select" onchange="changeVariation('${e.id}', this.value)">`
-        + opts.map(v => `<option value="${v.replace(/"/g, '&quot;')}"${v === cur ? ' selected' : ''}>${v.replace(/</g, '&lt;')}</option>`).join('')
+        + opts.map(v => `<option value="${escapeHtml(v)}"${v === cur ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')
         + `<option value="__custom__">➕ Custom…</option></select>`;
     }
 
@@ -3350,7 +3360,7 @@
       let html = '<p class="auth-help">Add, rename, or remove the variations for this exercise. Existing entries keep whatever they were set to.</p>';
       html += list.map((v, i) =>
         `<div class="entry-row">
-          <input type="text" class="entry-item-input" value="${v.replace(/"/g, '&quot;')}" onchange="renameVariation(${i}, this.value)">
+          <input type="text" class="entry-item-input" value="${escapeHtml(v)}" onchange="renameVariation(${i}, this.value)">
           <button class="entry-del" onclick="deleteVariation(${i})">×</button>
         </div>`
       ).join('');
@@ -3892,7 +3902,7 @@
         entries.forEach(e => {
           const time = e.t ? new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
           const when = (multi ? fmtDateShort(e._date) + ' ' : '') + time;
-          rows += `<div class="detail-row"><span class="detail-when">${when}</span><span class="detail-val">${g.fmt(e)}</span></div>`;
+          rows += `<div class="detail-row"><span class="detail-when">${when}</span><span class="detail-val">${escapeHtml(g.fmt(e))}</span></div>`;
         });
         html += `<div class="detail-group">
             <div class="detail-group-head" onclick="toggleDetailGroup('${g.key}')">
