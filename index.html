@@ -2807,6 +2807,7 @@
       });
     }
     const loggedBefore9 = key => hasEntryBetween(key, dayMs(0), dayMs(9));    // 00:00–08:59
+    const loggedBefore10 = key => hasEntryBetween(key, dayMs(0), dayMs(10));  // 00:00–09:59 (reading window)
     const loggedAfter = (key, h) => hasEntryBetween(key, dayMs(h), dayMs(24)); // h:00–23:59
     // A single cardio session (one entry) of at least `mins` minutes before 9am.
     const cardioSessionBefore9 = (key, mins) => getEntries(key).some(e => {
@@ -2831,14 +2832,14 @@
       const strengthCount = EXERCISES.filter(x => loggedBefore9(x.key)).length;
       const cardio10 = CARDIO.some(c => cardioSessionBefore9(c.key, 10));
       const exerciseReq = cardio10 || strengthCount >= 2;
-      const reading = loggedBefore9('reading');
+      const reading = loggedBefore10('reading');
       const meditation = loggedBefore9('meditation');
       const amJournal = !!getField('journal_am', false); // checkbox (no timestamp -> no 9am check)
       return {
         auto: exerciseReq && reading && meditation && amJournal,
         checks: [
           { label: '10min+ cardio or 2+ exercises before 9am', met: exerciseReq, detail: cardio10 ? 'cardio 10m+' : `${Math.min(strengthCount, 2)}/2 ex` },
-          { label: 'Reading before 9am', met: reading },
+          { label: 'Reading before 10am', met: reading },
           { label: 'Meditation before 9am', met: meditation },
           { label: 'AM journal done', met: amJournal },
         ],

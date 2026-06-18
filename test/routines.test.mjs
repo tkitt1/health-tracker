@@ -1,8 +1,8 @@
 // Verification for the Morning Routine auto-complete logic.
 // Run: node test/routines.test.mjs
 //
-// Rule: complete when the EXERCISE requirement is met AND reading AND meditation
-// each have a real entry before 9am local AND the AM journal box is checked.
+// Rule: complete when the EXERCISE requirement is met AND reading is logged before
+// 10am AND meditation is logged before 9am AND the AM journal box is checked.
 // The exercise requirement is satisfied by EITHER a single cardio session of
 // >=10 minutes before 9am, OR 2+ distinct strength exercises before 9am.
 // These helpers mirror the ones in index.html.
@@ -24,6 +24,7 @@ function makeApi(currentDate, store, fields = {}) {
     });
   }
   const loggedBefore9 = key => hasEntryBetween(key, dayMs(0), dayMs(9));
+  const loggedBefore10 = key => hasEntryBetween(key, dayMs(0), dayMs(10));
   const loggedAfter = (key, h) => hasEntryBetween(key, dayMs(h), dayMs(24));
   // A single cardio session (one entry) of at least `mins` minutes before 9am.
   const cardioSessionBefore9 = (key, mins) => getEntries(key).some(e => {
@@ -40,13 +41,13 @@ function makeApi(currentDate, store, fields = {}) {
     const strengthCount = EXERCISES.filter(loggedBefore9).length;
     const cardio10 = CARDIO.some(k => cardioSessionBefore9(k, 10));
     const exerciseReq = cardio10 || strengthCount >= 2;
-    return exerciseReq && loggedBefore9('reading') && loggedBefore9('meditation') && !!fields.journal_am;
+    return exerciseReq && loggedBefore10('reading') && loggedBefore9('meditation') && !!fields.journal_am;
   }
   function eveningAuto() {
     return !!fields.ptt && loggedAfter('meditation', 19) && loggedAfter('reading', 19)
       && sleepTimeOk(fields.sleep_time) && !!fields.journal_pm && !!fields.prepped_family;
   }
-  return { morningAuto, eveningAuto, loggedBefore9, loggedAfter, cardioSessionBefore9, sleepTimeOk };
+  return { morningAuto, eveningAuto, loggedBefore9, loggedBefore10, loggedAfter, cardioSessionBefore9, sleepTimeOk };
 }
 
 // timestamp helper: hour:min local on the viewed day
@@ -133,6 +134,30 @@ ok('missing meditation -> incomplete',
     pushups: [{ t: at(7), v: 20 }],
     squats: [{ t: at(7, 15), v: 30 }],
     reading: [{ t: at(8), v: 15 }],
+  }, { journal_am: true }).morningAuto(), false);
+
+// 4b. Reading at 9:30am (after 9, before 10) now counts -> complete.
+ok('reading at 9:30am counts (10am cutoff) -> complete',
+  makeApi(D, {
+    pushups: [{ t: at(7), v: 20 }],
+    squats: [{ t: at(7, 15), v: 30 }],
+    reading: [{ t: at(9, 30), v: 15 }],
+    meditation: [{ t: at(8, 30), v: 10 }],
+  }, { journal_am: true }).morningAuto(), true);
+
+// 4c. Reading at exactly 10am does NOT count.
+ok('reading at 10:00am excluded',
+  makeApi(D, { reading: [{ t: at(10), v: 15 }] }).loggedBefore10('reading'), false);
+ok('reading at 9:59am counts',
+  makeApi(D, { reading: [{ t: at(9, 59), v: 15 }] }).loggedBefore10('reading'), true);
+
+// 4d. Meditation cutoff stays 9am: meditation at 9:30 does NOT count -> incomplete.
+ok('meditation at 9:30am still excluded (9am cutoff) -> incomplete',
+  makeApi(D, {
+    pushups: [{ t: at(7), v: 20 }],
+    squats: [{ t: at(7, 15), v: 30 }],
+    reading: [{ t: at(8), v: 15 }],
+    meditation: [{ t: at(9, 30), v: 10 }],
   }, { journal_am: true }).morningAuto(), false);
 
 // --- unit checks ---
