@@ -1345,7 +1345,7 @@
       </div>
       <div class="timer-card">
         <div class="timer-display">
-          <div class="timer-time" id="timerDisplay">30:00</div>
+          <div class="timer-time" id="timerDisplay">25:00</div>
           <div class="progress-bar">
             <div class="progress-fill work" id="progressFill" style="width: 0%"></div>
           </div>
@@ -1668,8 +1668,8 @@
       { key: 'evening_routine', label: 'Evening Routine', icon: '🌙', status: () => eveningStatus() },
     ];
 
-    const WORK_DURATION = 30 * 60;
-    const SHORT_BREAK = 4 * 60;
+    const WORK_DURATION = 25 * 60;
+    const SHORT_BREAK = 5 * 60;
     const LONG_BREAK = 15 * 60;
     const PERIODS_BEFORE_LONG = 4;
 
@@ -3597,7 +3597,7 @@
       const total = phaseDur(t.phase);
       let label, cls;
       if (t.phase === 'work') { label = 'Work Period'; cls = 'work'; }
-      else if (t.phase === 'short-break') { label = 'Short Break (4 min)'; cls = 'short-break'; }
+      else if (t.phase === 'short-break') { label = 'Short Break (5 min)'; cls = 'short-break'; }
       else { label = 'Long Break (15 min)'; cls = 'long-break'; }
 
       const dEl = document.getElementById('timerDisplay'); if (dEl) dEl.textContent = formatTime(remaining);
