@@ -1687,6 +1687,12 @@
     // Device-local preferences — never synced (theme follows each device's OS; sound is per-device).
     const LOCAL_ONLY_KEYS = ['ht_meta', 'ht_theme', 'ht_sound', 'ht_collapsed', 'ht_ntfy_topic'];
 
+    // Parse JSON without ever throwing — corrupt localStorage must not crash a read.
+    function safeParse(raw, fallback) {
+      if (raw == null) return fallback;
+      try { return JSON.parse(raw); } catch (e) { return fallback; }
+    }
+
     function metaGet() { try { return JSON.parse(localStorage.getItem('ht_meta') || '{}'); } catch (e) { return {}; } }
     function metaSet(m) { localStorage.setItem('ht_meta', JSON.stringify(m)); }
 
@@ -2097,7 +2103,17 @@
     function getData() {
       const key = 'ht_' + dateKey();
       const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : {};
+      if (raw == null) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        // Corrupt day record: preserve the raw bytes for recovery under a
+        // local-only key (no ht_ prefix => never synced), then fall back to
+        // empty so the app keeps working instead of white-screening.
+        try { localStorage.setItem('__ht_corrupt_' + dateKey() + '_' + Date.now(), raw); } catch (e2) {}
+        console.warn('Corrupt record for ' + key + '; backed up and reset.', e);
+        return {};
+      }
     }
 
     function saveData(data) {
@@ -3893,7 +3909,7 @@
       const types = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']];
       const { from, to, start, end } = reportRange();
       const days = allDayKeys().filter(d => d >= from && d <= to);
-      const ds = days.map(d => JSON.parse(localStorage.getItem('ht_' + d) || '{}'));
+      const ds = days.map(d => safeParse(localStorage.getItem('ht_' + d), {}));
       const n = ds.length;
       const body = document.getElementById('reportBody');
 
@@ -3983,7 +3999,7 @@
 
       const rows = Object.keys(localStorage)
         .filter(k => /^ht_\d{4}-\d{2}-\d{2}$/.test(k))
-        .map(k => ({ date: k.slice(3), data: JSON.parse(localStorage.getItem(k) || '{}') }))
+        .map(k => ({ date: k.slice(3), data: safeParse(localStorage.getItem(k), {}) }))
         .filter(r => r.date >= from && r.date <= to)
         .sort((a, b) => a.date < b.date ? -1 : 1);
 
@@ -4084,7 +4100,7 @@
         const key = 'ht_' + dateKey(d);
         const raw = localStorage.getItem(key);
         if (raw) {
-          days.push({ date: formatDate(d), data: JSON.parse(raw) });
+          days.push({ date: formatDate(d), data: safeParse(raw, {}) });
         }
       }
 
