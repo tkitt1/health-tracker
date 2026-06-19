@@ -1069,6 +1069,8 @@
       min-height: 20px;
       font-size: 0.78rem;
     }
+    .app-notice { margin-top: 6px; padding: 6px 10px; border-radius: 8px;
+      background: #b91c1c; color: #fff; font-size: 13px; }
     .auth-note { color: var(--text-muted); }
     .auth-link {
       background: none;
@@ -1303,6 +1305,7 @@
         </svg>
         <div class="header-right">
           <div class="auth-bar" id="authBar"></div>
+          <div class="app-notice" id="appNotice" style="display:none"></div>
           <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌓</button>
         </div>
       </div>
@@ -1693,12 +1696,31 @@
       try { return JSON.parse(raw); } catch (e) { return fallback; }
     }
 
+    // Non-blocking, auto-dismissing notice for recoverable problems (e.g. storage full).
+    let _noticeTimer = null;
+    function showNotice(msg) {
+      const el = document.getElementById('appNotice');
+      if (!el) return;
+      el.textContent = '⚠ ' + msg;
+      el.style.display = '';
+      if (_noticeTimer) clearTimeout(_noticeTimer);
+      _noticeTimer = setTimeout(() => { el.style.display = 'none'; }, 6000);
+    }
+
     function metaGet() { try { return JSON.parse(localStorage.getItem('ht_meta') || '{}'); } catch (e) { return {}; } }
     function metaSet(m) { localStorage.setItem('ht_meta', JSON.stringify(m)); }
 
     // Central write: mirror every key to localStorage AND the cloud.
     function persist(key, value) {
-      localStorage.setItem(key, value);
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        // Quota exceeded / private mode: don't let the failure break the
+        // interaction. Warn the user, and still push to the cloud below so a
+        // signed-in user's change isn't lost.
+        showNotice('Couldn’t save locally — storage may be full.');
+        console.warn('localStorage write failed for ' + key, e);
+      }
       const m = metaGet(); m[key] = Date.now(); metaSet(m);
       pushKey(key, value, m[key]);
     }
