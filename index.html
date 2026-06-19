@@ -1381,7 +1381,7 @@
             <div class="timer-stat-label">Until Long Break</div>
           </div>
         </div>
-        <div class="var-manage"><span class="view-link" style="margin-left:0" onclick="openPeriods()">⚙ Edit work periods</span></div>
+        <div class="var-manage"><span class="view-link" style="margin-left:0" onclick="openPeriods()">⚙ Edit work periods</span><span class="view-link" id="ntfyLink" onclick="setNtfyTopic()">🔔 Phone alerts: off</span></div>
       </div>
     </div>
 
@@ -1685,7 +1685,7 @@
     }
 
     // Device-local preferences — never synced (theme follows each device's OS; sound is per-device).
-    const LOCAL_ONLY_KEYS = ['ht_meta', 'ht_theme', 'ht_sound', 'ht_collapsed'];
+    const LOCAL_ONLY_KEYS = ['ht_meta', 'ht_theme', 'ht_sound', 'ht_collapsed', 'ht_ntfy_topic'];
 
     function metaGet() { try { return JSON.parse(localStorage.getItem('ht_meta') || '{}'); } catch (e) { return {}; } }
     function metaSet(m) { localStorage.setItem('ht_meta', JSON.stringify(m)); }
@@ -3491,6 +3491,33 @@
       refreshTimerUI(t);
     }
 
+    // ---- Phone push via ntfy.sh ----
+    // The browser tab POSTs the alert to your ntfy topic; the ntfy app on your phone
+    // (subscribed to the same topic) shows it. Device-local config (the sending device).
+    function ntfyTopic() { return (localStorage.getItem('ht_ntfy_topic') || '').trim(); }
+    function pushPhone(message) {
+      const topic = ntfyTopic();
+      if (!topic) return;
+      // Plain-text body = a CORS-safelisted request (no preflight), so this works cross-origin.
+      try { fetch('https://ntfy.sh/' + encodeURIComponent(topic), { method: 'POST', body: message }).catch(() => {}); } catch (e) {}
+    }
+    function updateNtfyLink() {
+      const el = document.getElementById('ntfyLink');
+      if (el) el.textContent = '🔔 Phone alerts: ' + (ntfyTopic() ? 'on' : 'off');
+    }
+    function setNtfyTopic() {
+      const cur = ntfyTopic();
+      const v = window.prompt(
+        'Phone alerts via ntfy.sh:\n1) Install the free "ntfy" app on your phone.\n2) Subscribe to a unique topic name (e.g. tk-worktimer-' + Math.random().toString(36).slice(2, 7) + ').\n3) Enter that same topic below.\n\nLeave blank to turn phone alerts off.',
+        cur
+      );
+      if (v === null) return; // cancelled
+      const topic = v.trim();
+      if (topic) { localStorage.setItem('ht_ntfy_topic', topic); pushPhone('✅ Phone alerts connected — work-timer notifications will arrive here.'); }
+      else { localStorage.removeItem('ht_ntfy_topic'); }
+      updateNtfyLink();
+    }
+
     function announceFiveMin() {
       if (soundEnabled) {
         initAudio();
@@ -3500,6 +3527,7 @@
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Health Tracker', { body: '5 minutes left in work period' });
       }
+      pushPhone('⏳ 5 minutes left in work period');
     }
 
     // Build the browser-tab title from the live timer so the tab reads as a
@@ -3757,6 +3785,7 @@
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Health Tracker', { body });
       }
+      pushPhone((backToWork ? '💪 ' : '☕ ') + body);
     }
 
     // ---- CSV export (one row per day, all metrics) ----
@@ -4146,6 +4175,7 @@
       renderRoutines();
       refreshTimerUI();
       updateSoundBtn();
+      updateNtfyLink();
       updateSectionSummaries();
       applyCollapsed();
     }
