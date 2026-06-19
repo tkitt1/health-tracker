@@ -3630,6 +3630,35 @@
       render();
     }
 
+    // "Ended" stat. If End Day wasn't pressed, show "n/a" (not blank) once it's past
+    // 10pm today, or on any past day — and keep it click-to-edit so you can fix it later.
+    function endStatHtml(endMs, viewedIsToday) {
+      const fmtClock = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      let label;
+      if (endMs) label = fmtClock(endMs);
+      else if (!viewedIsToday || new Date().getHours() >= 22) label = 'n/a'; // forgot to End Day
+      else label = '+ set';
+      return `<span class="timer-stat-editable" onclick="editEnd()" title="Edit end time">${label}</span>`;
+    }
+    function defaultEndMsForViewedDay() {
+      const d = new Date(currentDate); d.setHours(22, 0, 0, 0); return d.getTime(); // default the picker to 10pm
+    }
+    function editEnd() {
+      const el = document.getElementById('workEndStat');
+      if (!el) return;
+      const cur = getField('work_ended_at', 0) || defaultEndMsForViewedDay();
+      el.innerHTML = `<input type="datetime-local" class="timer-edit-input" value="${toLocalInput(cur)}"
+        onchange="setEnd(this.value)" onblur="refreshTimerUI()">`;
+      const input = el.querySelector('input');
+      if (input) input.focus();
+    }
+    function setEnd(value) {
+      const ms = parseLocalDateTime(value);
+      if (ms == null) { refreshTimerUI(); return; }
+      saveField('work_ended_at', ms); // applies to the day being viewed
+      render();
+    }
+
     function renderPastTimerCard() {
       setTimerChrome(false);
       const fmtClock = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -3647,7 +3676,8 @@
       const startStat = document.getElementById('workStartStat');
       if (startStat) startStat.innerHTML =
         `<span class="timer-stat-editable" onclick="editPastStart()" title="Edit start time">${startMs ? fmtClock(startMs) : '+ set'}</span>`;
-      set('workEndStat', endMs ? fmtClock(endMs) : '—');
+      const endStat = document.getElementById('workEndStat');
+      if (endStat) endStat.innerHTML = endStatHtml(endMs, false);
       set('workPeriods', periods);
       set('totalWorkTime', fmtHM(totalMin));
       set('cycleCount', '—'); // "Until Long Break" is a live-only concept
@@ -3694,7 +3724,8 @@
       const wsEl = document.getElementById('workStartStat');
       if (wsEl) wsEl.textContent = startMs ? fmtClock(startMs) : '—';
       const weEl = document.getElementById('workEndStat');
-      if (weEl) weEl.textContent = endMs ? fmtClock(endMs) : '—';
+      // Don't clobber an open editor on the 1-second tick.
+      if (weEl && !weEl.querySelector('input')) weEl.innerHTML = endStatHtml(endMs, true);
 
       // After End Day the live counters are zeroed for the next session, so show the
       // day's final values (endedPeriods + recorded total) instead of 0.
