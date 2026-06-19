@@ -4200,22 +4200,33 @@
       }
     }
 
+    // Isolate each section so a throw in one can't blank the whole page.
+    function safeRender(name, fn) {
+      try { fn(); }
+      catch (e) {
+        console.error('render section "' + name + '" failed', e);
+        const host = document.getElementById('sec_' + name) || document.getElementById(name);
+        if (host) host.insertAdjacentHTML('afterbegin',
+          '<div class="app-notice" style="display:block">⚠ Couldn\'t load this section.</div>');
+      }
+    }
+
     function render() {
       document.getElementById('dateDisplay').textContent = formatDate(currentDate);
       const todayBtn = document.getElementById('todayBtn');
       if (todayBtn) todayBtn.style.display = isToday() ? 'none' : '';
-      renderExercises();
-      renderCardio();
-      renderIntake();
-      renderMeasures();
-      renderIF();
-      renderMind();
-      renderRoutines();
-      refreshTimerUI();
-      updateSoundBtn();
-      updateNtfyLink();
-      updateSectionSummaries();
-      applyCollapsed();
+      safeRender('exercises', renderExercises);
+      safeRender('cardio', renderCardio);
+      safeRender('intake', renderIntake);
+      safeRender('measures', renderMeasures);
+      safeRender('if', renderIF);
+      safeRender('mind', renderMind);
+      safeRender('routines', renderRoutines);
+      safeRender('timer', refreshTimerUI);
+      safeRender('sound', updateSoundBtn);
+      safeRender('ntfy', updateNtfyLink);
+      safeRender('summaries', updateSectionSummaries);
+      safeRender('collapsed', applyCollapsed);
     }
 
     // ---- Theme: 3-way toggle — Auto (follow OS) → Light → Dark ----
