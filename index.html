@@ -2909,7 +2909,11 @@
       routineExpanded[key] = !routineExpanded[key];
       renderRoutines();
     }
-    // Completion is MANUAL only: the card is done solely when the user marks it.
+    // Completed when all conditions are met (automatic), or when manually marked.
+    function routineDone(r) {
+      return r.status().auto || !!getField(r.key, false);
+    }
+    // Manual override (used when conditions aren't all met but you did it anyway).
     function toggleRoutine(key) {
       saveField(key, !getField(key, false));
       render();
@@ -2919,14 +2923,18 @@
       if (!grid) return;
       grid.innerHTML = ROUTINES.map(r => {
         const st = r.status();
-        const done = !!getField(r.key, false); // manual completion flag
+        const auto = st.auto;                       // all conditions met -> auto complete
+        const manual = !!getField(r.key, false);    // manual override flag
+        const done = auto || manual;
         const expanded = !!routineExpanded[r.key];
         const checks = st.checks.map(c =>
           `<div class="routine-check ${c.met ? 'met' : ''}">
              <span class="routine-check-box">${c.met ? '✓' : ''}</span>
              <span>${c.label}${c.detail ? ` <span class="routine-check-detail">(${c.detail})</span>` : ''}</span>
            </div>`).join('');
-        const hint = (st.auto && !done) ? '<div class="routine-hint">All conditions met — tap “Mark complete”.</div>' : '';
+        const footer = auto
+          ? '<div class="routine-hint">✓ Auto-completed — all conditions met.</div>'
+          : `<button class="routine-override" onclick="event.stopPropagation();toggleRoutine('${r.key}')">${manual ? 'Mark incomplete' : 'Mark complete'}</button>`;
         return `
           <div class="card routine-card ${done ? 'done' : ''} ${expanded ? 'expanded' : ''}" onclick="toggleRoutineExpand('${r.key}')" title="Tap to show conditions">
             <div class="card-header">
@@ -2937,8 +2945,7 @@
             </div>
             <div class="routine-checks">
               ${checks}
-              ${hint}
-              <button class="routine-override" onclick="event.stopPropagation();toggleRoutine('${r.key}')">${done ? 'Mark incomplete' : 'Mark complete'}</button>
+              ${footer}
             </div>
           </div>`;
       }).join('');
@@ -4218,7 +4225,7 @@
       set('intake', cnt(INTAKE) + ' logged');
       set('measures', cnt(MEASURES) + ' logged');
       set('mind', cnt(MIND) + ' logged');
-      set('routines', ROUTINES.filter(r => getField(r.key, false)).length + '/' + ROUTINES.length + ' done');
+      set('routines', ROUTINES.filter(routineDone).length + '/' + ROUTINES.length + ' done');
       // Timer summary follows the viewed day: live counters today, recorded values on past days.
       if (isToday()) {
         const t = getTimer();
