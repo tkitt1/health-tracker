@@ -1,3 +1,6 @@
 # Editor / preview tooling (not needed for hosting)
 .claude/
 .DS_Store
+.gstack/
+.impeccable/
+.superpowers/
