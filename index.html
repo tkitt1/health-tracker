@@ -18,8 +18,9 @@
       --surface-hover: #222632;
       --border: #2a2e3a;
       --text: #e4e4e7;
-      --text-muted: #71717a;
+      --text-muted: #8b8b94;
       --accent: #6366f1;
+      --accent-text: #818cf8;
       --accent-glow: rgba(99, 102, 241, 0.15);
       --green: #22c55e;
       --green-glow: rgba(34, 197, 94, 0.15);
@@ -37,8 +38,9 @@
       --surface-hover: #eceef1;
       --border: #d8dbe0;
       --text: #1a1d27;
-      --text-muted: #6b7280;
+      --text-muted: #646b77;
       --accent: #6366f1;
+      --accent-text: #4f46e5;
       --accent-glow: rgba(99, 102, 241, 0.12);
       --green: #16a34a;
       --green-glow: rgba(22, 163, 74, 0.12);
@@ -50,6 +52,17 @@
     }
     body.light input[type="datetime-local"],
     body.light input[type="date"] { color-scheme: light; }
+
+    /* Respect users who ask for less motion: collapse transitions/animations
+       to near-instant so progress fills, chevrons, and hovers don't animate. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -154,7 +167,7 @@
     .date-nav .date-display {
       font-size: 1rem;
       font-weight: 600;
-      color: var(--accent);
+      color: var(--accent-text);
       min-width: 110px;
       text-align: center;
     }
@@ -165,7 +178,7 @@
       border-radius: 18px;
       font-size: 0.85rem;
       font-weight: 600;
-      color: var(--accent);
+      color: var(--accent-text);
     }
 
     .section {
@@ -195,6 +208,12 @@
       justify-content: flex-start;
       margin-bottom: 10px;
     }
+    /* Visible keyboard focus for the collapsible section headers (a11y). */
+    .section-toggle:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
     .section-summary {
       font-size: 0.75rem;
       font-weight: 500;
@@ -214,7 +233,7 @@
       margin-bottom: 10px;
       background: var(--accent-glow);
       border: 1px solid var(--accent);
-      color: var(--accent);
+      color: var(--accent-text);
       border-radius: 8px;
       padding: 6px 12px;
       font-size: 0.8rem;
@@ -339,6 +358,21 @@
     }
     .routine-override:hover { background: var(--surface-hover); color: var(--text); }
 
+    /* Accessibility: guarantee a >=44px touch target on small icon controls
+       without changing their visual size (centered, invisible hit area). */
+    .theme-toggle, .date-nav button, .counter button,
+    .entry-del, .intake-controls button, .cal-nav button { position: relative; }
+    .theme-toggle::after, .date-nav button::after, .counter button::after,
+    .entry-del::after, .intake-controls button::after, .cal-nav button::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+    }
+
     .counter {
       display: flex;
       align-items: center;
@@ -348,7 +382,7 @@
     .counter button {
       background: var(--accent-glow);
       border: 1px solid var(--accent);
-      color: var(--accent);
+      color: var(--accent-text);
       width: 32px;
       height: 32px;
       border-radius: 8px;
@@ -424,6 +458,13 @@
       margin-bottom: 12px;
       flex-wrap: wrap;
     }
+    /* Keep a number and its unit together so the unit never wraps alone. */
+    .total-pair {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      white-space: nowrap;
+    }
 
     .total-value {
       font-size: 1.5rem;
@@ -476,7 +517,7 @@
     .view-link {
       margin-left: auto;
       font-size: 0.72rem;
-      color: var(--accent);
+      color: var(--accent-text);
       cursor: pointer;
       user-select: none;
     }
@@ -723,7 +764,7 @@
 
     .btn-endday {
       background: var(--accent-glow);
-      color: var(--accent);
+      color: var(--accent-text);
       border: 1px solid var(--accent) !important;
     }
 
@@ -760,7 +801,7 @@
     /* Editable "Started" on a past day's timer card */
     .timer-stat-editable {
       cursor: pointer;
-      color: var(--accent);
+      color: var(--accent-text);
       border-bottom: 1px dashed var(--accent);
     }
     .timer-edit-input {
@@ -784,9 +825,12 @@
     }
 
     .progress-fill {
+      width: 100%;
       height: 100%;
       border-radius: 2px;
-      transition: width 1s linear;
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 1s linear;
     }
 
     .progress-fill.work { background: var(--green); }
@@ -828,7 +872,7 @@
     .intake-controls button {
       background: var(--accent-glow);
       border: 1px solid var(--accent);
-      color: var(--accent);
+      color: var(--accent-text);
       width: 28px;
       height: 28px;
       border-radius: 6px;
@@ -915,10 +959,13 @@
       margin: 8px 0;
     }
     .if-fill {
+      width: 100%;
       height: 100%;
       background: var(--blue);
       border-radius: 4px;
-      transition: width 0.5s linear;
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.5s linear;
     }
     .if-fill.done { background: var(--green); }
     .if-meta { font-size: 0.8rem; color: var(--text-muted); }
@@ -946,7 +993,7 @@
     .goal-btn.active {
       background: var(--accent-glow);
       border-color: var(--accent);
-      color: var(--accent);
+      color: var(--accent-text);
     }
     .goal-row input.if-days {
       width: 70px;
@@ -976,7 +1023,7 @@
     .if-restart-btn {
       background: var(--accent-glow);
       border: 1px solid var(--accent);
-      color: var(--accent);
+      color: var(--accent-text);
     }
     .if-elapsed.reached { color: var(--green); }
     .if-reset-btn {
@@ -1075,7 +1122,7 @@
     .auth-link {
       background: none;
       border: none;
-      color: var(--accent);
+      color: var(--accent-text);
       cursor: pointer;
       font-size: 0.78rem;
       font-weight: 600;
@@ -1284,13 +1331,13 @@
             <path d="M138,200L186,200L209,145L240,252L265,200L313,200" style="fill:none;fill-rule:nonzero;stroke:url(#_Linear5);stroke-width:18px;stroke-linejoin:round;"/>
             <g>
               <g transform="matrix(1,0,0,1,415,128)">
-                <text class="lg-word" x="0px" y="0px" style="font-family:'Inter-Regular', 'Inter';font-size:66px;">M<tspan x="58.621px " y="0px ">y</tspan></text>
+                <path class="lg-word" d="M11.63 0L5.80 0L5.80-48.02L14.50-48.02L26.33-17.72Q26.75-16.66 27.28-15.07Q27.81-13.47 28.41-11.60Q29-9.73 29.55-7.88Q30.10-6.03 30.52-4.45L29.17-4.45Q29.62-5.93 30.16-7.75Q30.71-9.57 31.31-11.46Q31.90-13.34 32.45-14.99Q33-16.63 33.42-17.72L45.08-48.02L53.82-48.02L53.82 0L47.79 0L47.79-27.42Q47.79-28.91 47.81-30.81Q47.82-32.71 47.87-34.80Q47.92-36.90 47.97-39.06Q48.02-41.22 48.05-43.25L48.57-43.25Q47.89-41.02 47.13-38.72Q46.37-36.42 45.65-34.27Q44.92-32.13 44.28-30.36Q43.63-28.58 43.18-27.42L32.45 0L27.13 0L16.24-27.42Q15.79-28.55 15.18-30.28Q14.57-32 13.84-34.11Q13.12-36.22 12.34-38.56Q11.57-40.90 10.76-43.25L11.34-43.25Q11.41-41.44 11.46-39.35Q11.50-37.25 11.54-35.11Q11.57-32.97 11.60-30.99Q11.63-29 11.63-27.42L11.63 0M63.13 13.05L64.62 8.02L65.23 8.19Q67 8.64 68.45 8.43Q69.90 8.22 71.06 6.99Q72.22 5.77 73.09 3.19L74.12 0.19L60.36-36.03L66.71-36.03L74.38-14.66Q75.60-11.31 76.44-8.02Q77.28-4.74 78.21-1.64L76.09-1.64Q77.02-4.74 77.88-8.04Q78.73-11.34 79.92-14.66L87.66-36.03L93.97-36.03L78.15 5.38Q77.05 8.25 75.52 10.10Q73.99 11.96 71.96 12.84Q69.93 13.73 67.39 13.73Q65.84 13.73 64.71 13.50Q63.58 13.28 63.13 13.05"/>
               </g>
               <g transform="matrix(1,0,0,1,415,213)">
-                <text class="lg-word" x="0px" y="0px" style="font-family:'Inter-Regular', 'Inter';font-size:66px;">P<tspan x="40.478px 77.636px 102.194px 123.368px 161.623px 186.181px 242.675px 278.416px 316.09px 352.475px " y="0px 0px 0px 0px 0px 0px 0px 0px 0px 0px ">erformance</tspan></text>
+                <path class="lg-word" d="M11.92 0L5.80 0L5.80-48.02L22.24-48.02Q27.84-48.02 31.47-45.97Q35.09-43.92 36.85-40.48Q38.61-37.03 38.61-32.74Q38.61-28.46 36.85-24.98Q35.09-21.50 31.49-19.43Q27.88-17.37 22.27-17.37L10.63-17.37L10.63-22.75L21.98-22.75Q25.78-22.75 28.10-24.06Q30.42-25.36 31.47-27.63Q32.52-29.91 32.52-32.74Q32.52-35.58 31.47-37.82Q30.42-40.06 28.09-41.35Q25.75-42.64 21.91-42.64L11.92-42.64L11.92 0M60.72 0.77Q55.50 0.77 51.71-1.55Q47.92-3.87 45.88-8.02Q43.83-12.18 43.83-17.72Q43.83-23.27 45.83-27.49Q47.83-31.71 51.48-34.10Q55.14-36.48 60.04-36.48Q62.91-36.48 65.70-35.53Q68.48-34.58 70.75-32.47Q73.03-30.36 74.38-26.91Q75.73-23.46 75.73-18.47L75.73-16.05L47.76-16.05L47.76-20.95L72.61-20.95L69.90-19.14Q69.90-22.69 68.79-25.44Q67.68-28.20 65.49-29.76Q63.29-31.32 60.04-31.32Q56.78-31.32 54.46-29.73Q52.14-28.13 50.92-25.57Q49.69-23.01 49.69-20.08L49.69-16.82Q49.69-12.83 51.08-10.04Q52.47-7.25 54.96-5.82Q57.46-4.38 60.75-4.38Q62.88-4.38 64.62-5Q66.36-5.61 67.61-6.85Q68.87-8.09 69.55-9.93L75.15-8.38Q74.32-5.67 72.32-3.61Q70.32-1.55 67.37-0.39Q64.42 0.77 60.72 0.77M88.53 0L82.73 0L82.73-36.03L88.34-36.03L88.34-30.49L88.72-30.49Q89.72-33.23 92.28-34.89Q94.84-36.54 98.07-36.54Q98.71-36.54 99.60-36.51Q100.48-36.48 101-36.45L101-30.62Q100.74-30.68 99.71-30.81Q98.68-30.94 97.52-30.94Q94.94-30.94 92.90-29.86Q90.85-28.78 89.69-26.89Q88.53-25.01 88.53-22.56L88.53 0M102.84-36.03L124.04-36.03L124.04-31.07L102.84-31.07L102.84-36.03M115.73 0L109.93 0L109.93-40.83Q109.93-43.96 111.39-46.05Q112.86-48.15 115.21-49.21Q117.57-50.27 120.18-50.27Q122.24-50.27 123.59-49.94Q124.95-49.60 125.59-49.31L123.98-44.34Q123.53-44.50 122.80-44.70Q122.08-44.89 120.85-44.89Q118.18-44.89 116.95-43.52Q115.73-42.15 115.73-39.54L115.73 0M143.12 0.77Q138.22 0.77 134.53-1.55Q130.84-3.87 128.78-8.06Q126.72-12.25 126.72-17.79Q126.72-23.43 128.78-27.63Q130.84-31.84 134.53-34.16Q138.22-36.48 143.12-36.48Q148.05-36.48 151.76-34.16Q155.47-31.84 157.53-27.63Q159.59-23.43 159.59-17.79Q159.59-12.25 157.53-8.06Q155.47-3.87 151.76-1.55Q148.05 0.77 143.12 0.77M143.12-4.42Q146.76-4.42 149.12-6.28Q151.47-8.15 152.60-11.20Q153.73-14.24 153.73-17.79Q153.73-21.37 152.60-24.44Q151.47-27.52 149.12-29.41Q146.76-31.29 143.12-31.29Q139.51-31.29 137.19-29.41Q134.87-27.52 133.74-24.46Q132.62-21.40 132.62-17.79Q132.62-14.24 133.74-11.20Q134.87-8.15 137.19-6.28Q139.51-4.42 143.12-4.42M172.52 0L166.71 0L166.71-36.03L172.32-36.03L172.32-30.49L172.71-30.49Q173.71-33.23 176.27-34.89Q178.83-36.54 182.05-36.54Q182.70-36.54 183.59-36.51Q184.47-36.48 184.99-36.45L184.99-30.62Q184.73-30.68 183.70-30.81Q182.67-30.94 181.51-30.94Q178.93-30.94 176.88-29.86Q174.84-28.78 173.68-26.89Q172.52-25.01 172.52-22.56L172.52 0M197.07 0L191.27 0L191.27-36.03L196.91-36.03L196.94-27.97L196.49-27.97Q197.23-30.91 198.83-32.82Q200.43-34.74 202.57-35.71Q204.71-36.67 207.03-36.67Q210.96-36.67 213.40-34.26Q215.83-31.84 216.54-27.91L215.76-27.91Q216.41-30.62 218.12-32.58Q219.83-34.55 222.26-35.61Q224.69-36.67 227.56-36.67Q230.69-36.67 233.26-35.32Q235.84-33.97 237.37-31.23Q238.90-28.49 238.90-24.30L238.90 0L233.10 0L233.10-24.14Q233.10-28.04 230.91-29.71Q228.72-31.39 225.82-31.39Q223.40-31.39 221.65-30.37Q219.89-29.36 218.94-27.59Q217.99-25.81 217.99-23.53L217.99 0L212.19 0L212.19-24.72Q212.19-27.71 210.19-29.55Q208.19-31.39 205.13-31.39Q203.04-31.39 201.18-30.41Q199.33-29.42 198.20-27.49Q197.07-25.56 197.07-22.69L197.07 0M257.85 0.84Q254.44 0.84 251.65-0.45Q248.86-1.74 247.22-4.22Q245.58-6.70 245.58-10.25Q245.58-13.34 246.80-15.28Q248.02-17.21 250.07-18.32Q252.12-19.43 254.60-19.98Q257.08-20.53 259.59-20.85Q262.82-21.27 264.85-21.50Q266.88-21.72 267.86-22.27Q268.84-22.82 268.84-24.14L268.84-24.33Q268.84-26.59 268.01-28.15Q267.17-29.71 265.49-30.55Q263.82-31.39 261.30-31.39Q258.72-31.39 256.89-30.58Q255.05-29.78 253.91-28.57Q252.76-27.36 252.18-26.10L246.61-27.94Q247.99-31.23 250.34-33.08Q252.70-34.93 255.53-35.71Q258.37-36.48 261.14-36.48Q262.95-36.48 265.25-36.05Q267.55-35.61 269.70-34.32Q271.84-33.03 273.24-30.50Q274.64-27.97 274.64-23.75L274.64 0L268.94 0L268.94-4.90L268.55-4.90Q267.94-3.64 266.59-2.30Q265.23-0.97 263.07-0.06Q260.92 0.84 257.85 0.84M258.85-4.29Q262.08-4.29 264.30-5.54Q266.52-6.80 267.68-8.81Q268.84-10.83 268.84-13.02L268.84-18.01Q268.49-17.60 267.30-17.26Q266.10-16.92 264.57-16.66Q263.04-16.40 261.61-16.23Q260.17-16.05 259.34-15.95Q257.24-15.69 255.42-15.07Q253.60-14.44 252.50-13.23Q251.41-12.02 251.41-9.96Q251.41-8.09 252.38-6.83Q253.34-5.58 255.02-4.93Q256.69-4.29 258.85-4.29M289.31-21.59L289.31 0L283.51 0L283.51-36.03L289.08-36.03L289.12-27.30L288.31-27.30Q289.95-32.29 293-34.39Q296.04-36.48 300.14-36.48Q303.78-36.48 306.52-34.98Q309.26-33.48 310.79-30.47Q312.32-27.46 312.32-22.88L312.32 0L306.52 0L306.52-22.40Q306.52-26.55 304.34-28.91Q302.17-31.26 298.40-31.26Q295.82-31.26 293.76-30.13Q291.69-29 290.50-26.84Q289.31-24.69 289.31-21.59M335.84 0.77Q330.95 0.77 327.26-1.55Q323.57-3.87 321.50-8.06Q319.44-12.25 319.44-17.79Q319.44-23.43 321.50-27.63Q323.57-31.84 327.26-34.16Q330.95-36.48 335.84-36.48Q338.46-36.48 340.78-35.80Q343.10-35.13 345.01-33.85Q346.93-32.58 348.32-30.73Q349.70-28.87 350.44-26.52L344.87-24.94Q344.48-26.33 343.68-27.49Q342.87-28.65 341.73-29.50Q340.58-30.36 339.10-30.82Q337.62-31.29 335.84-31.29Q332.24-31.29 329.92-29.41Q327.59-27.52 326.47-24.46Q325.34-21.40 325.34-17.79Q325.34-14.24 326.47-11.20Q327.59-8.15 329.92-6.28Q332.24-4.42 335.84-4.42Q337.65-4.42 339.16-4.90Q340.68-5.38 341.86-6.27Q343.03-7.15 343.84-8.38Q344.64-9.60 345.03-11.05L350.57-9.47Q349.86-7.06 348.46-5.17Q347.06-3.29 345.13-1.95Q343.19-0.61 340.84 0.08Q338.49 0.77 335.84 0.77M372.71 0.77Q367.49 0.77 363.71-1.55Q359.92-3.87 357.87-8.02Q355.83-12.18 355.83-17.72Q355.83-23.27 357.82-27.49Q359.82-31.71 363.48-34.10Q367.14-36.48 372.04-36.48Q374.90-36.48 377.69-35.53Q380.48-34.58 382.75-32.47Q385.02-30.36 386.38-26.91Q387.73-23.46 387.73-18.47L387.73-16.05L359.76-16.05L359.76-20.95L384.60-20.95L381.90-19.14Q381.90-22.69 380.79-25.44Q379.67-28.20 377.48-29.76Q375.29-31.32 372.04-31.32Q368.78-31.32 366.46-29.73Q364.14-28.13 362.92-25.57Q361.69-23.01 361.69-20.08L361.69-16.82Q361.69-12.83 363.08-10.04Q364.46-7.25 366.96-5.82Q369.46-4.38 372.75-4.38Q374.87-4.38 376.61-5Q378.35-5.61 379.61-6.85Q380.87-8.09 381.54-9.93L387.15-8.38Q386.31-5.67 384.31-3.61Q382.32-1.55 379.37-0.39Q376.42 0.77 372.71 0.77"/>
               </g>
               <g transform="matrix(1,0,0,1,415,300)">
-                <text x="0px" y="0px" style="font-family:'Inter-Regular', 'Inter';font-size:70px;fill:url(#_Linear6);">T<tspan x="39.821px 64.773px 102.68px 141.27px 176.716px 216.126px " y="0px 0px 0px 0px 0px 0px ">racker</tspan></text>
+                <path fill="url(#_Linear6)" d="M19.38-45.19L3.35-45.19L3.35-50.93L41.84-50.93L41.84-45.19L25.87-45.19L25.87 0L19.38 0L19.38-45.19M51.37 0L45.22 0L45.22-38.21L51.17-38.21L51.17-32.33L51.58-32.33Q52.64-35.24 55.36-37Q58.07-38.76 61.49-38.76Q62.17-38.76 63.11-38.73Q64.05-38.69 64.60-38.66L64.60-32.47Q64.33-32.54 63.23-32.68Q62.14-32.81 60.91-32.81Q58.18-32.81 56.01-31.67Q53.83-30.52 52.60-28.52Q51.37-26.52 51.37-23.93L51.37 0M80.87 0.89Q77.25 0.89 74.29-0.48Q71.34-1.85 69.59-4.48Q67.85-7.11 67.85-10.87Q67.85-14.15 69.15-16.20Q70.45-18.25 72.62-19.43Q74.79-20.61 77.42-21.19Q80.05-21.77 82.72-22.11Q86.14-22.56 88.29-22.80Q90.44-23.04 91.48-23.62Q92.53-24.20 92.53-25.60L92.53-25.81Q92.53-28.20 91.64-29.86Q90.75-31.51 88.97-32.40Q87.19-33.29 84.53-33.29Q81.79-33.29 79.85-32.44Q77.90-31.58 76.68-30.30Q75.47-29.02 74.86-27.69L68.94-29.63Q70.41-33.12 72.91-35.09Q75.40-37.05 78.41-37.87Q81.42-38.69 84.36-38.69Q86.27-38.69 88.72-38.23Q91.16-37.77 93.43-36.40Q95.71-35.03 97.19-32.35Q98.68-29.67 98.68-25.19L98.68 0L92.63 0L92.63-5.20L92.22-5.20Q91.57-3.86 90.13-2.44Q88.70-1.03 86.41-0.07Q84.12 0.89 80.87 0.89M81.93-4.55Q85.35-4.55 87.71-5.88Q90.07-7.21 91.30-9.35Q92.53-11.48 92.53-13.81L92.53-19.11Q92.15-18.66 90.89-18.30Q89.62-17.94 88-17.67Q86.37-17.40 84.85-17.21Q83.33-17.02 82.44-16.92Q80.22-16.65 78.29-15.98Q76.36-15.31 75.20-14.03Q74.04-12.75 74.04-10.56Q74.04-8.58 75.06-7.25Q76.09-5.91 77.86-5.23Q79.64-4.55 81.93-4.55M123.63 0.82Q118.44 0.82 114.52-1.64Q110.61-4.10 108.42-8.54Q106.23-12.99 106.23-18.87Q106.23-24.85 108.42-29.31Q110.61-33.77 114.52-36.23Q118.44-38.69 123.63-38.69Q126.40-38.69 128.86-37.97Q131.32-37.26 133.36-35.91Q135.39-34.56 136.86-32.59Q138.33-30.62 139.12-28.13L133.20-26.46Q132.79-27.92 131.94-29.16Q131.08-30.39 129.87-31.29Q128.66-32.20 127.08-32.69Q125.51-33.19 123.63-33.19Q119.80-33.19 117.34-31.19Q114.88-29.19 113.69-25.94Q112.49-22.70 112.49-18.87Q112.49-15.11 113.69-11.88Q114.88-8.65 117.34-6.67Q119.80-4.68 123.63-4.68Q125.55-4.68 127.15-5.20Q128.76-5.71 130.01-6.65Q131.25-7.59 132.11-8.89Q132.96-10.19 133.37-11.72L139.25-10.05Q138.50-7.49 137.01-5.49Q135.53-3.49 133.48-2.07Q131.43-0.65 128.93 0.09Q126.43 0.82 123.63 0.82M159.18-20.06L152.45-13.74L152.45-21.36L153.57-21.36L169.91-38.21L177.53-38.21L159.86-20.06L159.18-20.06M152.82 0L146.67 0L146.67-50.93L152.82-50.93L152.82 0M178.73 0L170.84 0L156.21-18.70L160.58-23.04L178.73 0M198.18 0.82Q192.64 0.82 188.63-1.64Q184.61-4.10 182.44-8.51Q180.27-12.92 180.27-18.80Q180.27-24.68 182.39-29.16Q184.51-33.63 188.39-36.16Q192.27-38.69 197.46-38.69Q200.51-38.69 203.46-37.68Q206.42-36.67 208.83-34.44Q211.24-32.20 212.67-28.54Q214.11-24.88 214.11-19.58L214.11-17.02L184.44-17.02L184.44-22.22L210.79-22.22L207.92-20.30Q207.92-24.06 206.74-26.98Q205.56-29.91 203.24-31.56Q200.92-33.22 197.46-33.22Q194.01-33.22 191.55-31.53Q189.09-29.84 187.79-27.12Q186.49-24.40 186.49-21.29L186.49-17.84Q186.49-13.60 187.96-10.65Q189.43-7.69 192.08-6.17Q194.73-4.65 198.22-4.65Q200.47-4.65 202.32-5.30Q204.16-5.95 205.50-7.26Q206.83-8.58 207.55-10.53L213.49-8.89Q212.60-6.02 210.49-3.83Q208.37-1.64 205.24-0.41Q202.11 0.82 198.18 0.82M227.68 0L221.53 0L221.53-38.21L227.47-38.21L227.47-32.33L227.88-32.33Q228.94-35.24 231.66-37Q234.38-38.76 237.80-38.76Q238.48-38.76 239.42-38.73Q240.36-38.69 240.91-38.66L240.91-32.47Q240.63-32.54 239.54-32.68Q238.45-32.81 237.21-32.81Q234.48-32.81 232.31-31.67Q230.14-30.52 228.91-28.52Q227.68-26.52 227.68-23.93"/>
               </g>
             </g>
           </g>
@@ -1320,10 +1367,10 @@
 
     <!-- Exercise Counters -->
     <div class="section" id="sec-exercise">
-      <div class="section-head section-toggle" onclick="toggleSection('exercise')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="exerciseSection" onclick="toggleSection('exercise')" onkeydown="sectionKey(event,'exercise')">
         <span class="section-title">Exercise</span>
         <span class="section-summary" id="sum-exercise"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div id="exerciseSection"></div>
     </div>
@@ -1331,26 +1378,26 @@
 
     <!-- Cardio -->
     <div class="section" id="sec-cardio">
-      <div class="section-head section-toggle" onclick="toggleSection('cardio')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="cardioGrid" onclick="toggleSection('cardio')" onkeydown="sectionKey(event,'cardio')">
         <span class="section-title">Cardio</span>
         <span class="section-summary" id="sum-cardio"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div class="card-grid" id="cardioGrid"></div>
     </div>
 
     <!-- Work Timer (Pomodoro-style) -->
     <div class="section" id="sec-timer">
-      <div class="section-head section-toggle" onclick="toggleSection('timer')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="timerSection" onclick="toggleSection('timer')" onkeydown="sectionKey(event,'timer')">
         <span class="section-title">Work Timer</span>
         <span class="section-summary" id="sum-timer"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
-      <div class="timer-card">
+      <div class="timer-card" id="timerSection">
         <div class="timer-display">
           <div class="timer-time" id="timerDisplay">25:00</div>
           <div class="progress-bar">
-            <div class="progress-fill work" id="progressFill" style="width: 0%"></div>
+            <div class="progress-fill work" id="progressFill" style="transform: scaleX(0)"></div>
           </div>
           <div class="timer-phase work" id="timerPhase">Work Period</div>
         </div>
@@ -1390,52 +1437,52 @@
 
     <!-- Intake -->
     <div class="section" id="sec-intake">
-      <div class="section-head section-toggle" onclick="toggleSection('intake')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="intakeSection" onclick="toggleSection('intake')" onkeydown="sectionKey(event,'intake')">
         <span class="section-title">Intake</span>
         <span class="section-summary" id="sum-intake"></span>
-        <button class="scan-btn" style="margin:0 0 0 auto" onclick="event.stopPropagation();document.getElementById('labelPhoto').click()" title="Photograph a nutrition label to auto-fill macros">📷 Scan label</button>
+        <button class="scan-btn" style="margin:0 0 0 auto" onclick="event.stopPropagation();document.getElementById('labelPhoto').click()" onkeydown="event.stopPropagation()" title="Photograph a nutrition label to auto-fill macros">📷 Scan label</button>
         <input type="file" id="labelPhoto" accept="image/*" capture="environment" style="display:none" onchange="onLabelPhoto(this)">
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div id="intakeSection"></div>
     </div>
 
     <!-- Measurements -->
     <div class="section" id="sec-measures">
-      <div class="section-head section-toggle" onclick="toggleSection('measures')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="measuresGrid" onclick="toggleSection('measures')" onkeydown="sectionKey(event,'measures')">
         <span class="section-title">Measurements</span>
         <span class="section-summary" id="sum-measures"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div class="card-grid" id="measuresGrid"></div>
     </div>
 
     <!-- Intermittent Fasting -->
     <div class="section" id="sec-fasting">
-      <div class="section-head section-toggle" onclick="toggleSection('fasting')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="ifCard" onclick="toggleSection('fasting')" onkeydown="sectionKey(event,'fasting')">
         <span class="section-title">Intermittent Fasting</span>
         <span class="section-summary" id="sum-fasting"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div class="if-card" id="ifCard"></div>
     </div>
 
     <!-- Mind -->
     <div class="section" id="sec-mind">
-      <div class="section-head section-toggle" onclick="toggleSection('mind')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="mindGrid" onclick="toggleSection('mind')" onkeydown="sectionKey(event,'mind')">
         <span class="section-title">Mind</span>
         <span class="section-summary" id="sum-mind"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div class="mind-grid" id="mindGrid"></div>
     </div>
 
     <!-- Routines -->
     <div class="section" id="sec-routines">
-      <div class="section-head section-toggle" onclick="toggleSection('routines')">
+      <div class="section-head section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="routinesGrid" onclick="toggleSection('routines')" onkeydown="sectionKey(event,'routines')">
         <span class="section-title">Routines</span>
         <span class="section-summary" id="sum-routines"></span>
-        <span class="section-chevron">▾</span>
+        <span class="section-chevron" aria-hidden="true">▾</span>
       </div>
       <div class="routines-grid" id="routinesGrid"></div>
     </div>
@@ -2383,9 +2430,18 @@
         const dist = sumEntries(c.key, 'dist');
         const n = getEntries(c.key).length;
         let speedLine = '';
-        if (c.speedUnit && time > 0 && dist > 0) {
-          const spd = c.speedUnit === 'km/h' ? round(dist * 60 / time) : round(dist / time); // km/h or m/min
-          speedLine = `<div class="if-meta">avg ${spd} ${c.speedUnit}</div>`;
+        if (time > 0 && dist > 0) {
+          if (c.distUnit === 'km') {
+            // Pace: minutes per km, shown mm:ss (running/cycling/walking convention).
+            const paceMin = time / dist;
+            let mm = Math.floor(paceMin);
+            let ss = Math.round((paceMin - mm) * 60);
+            if (ss === 60) { mm += 1; ss = 0; }
+            speedLine = `<div class="if-meta">avg ${mm}:${String(ss).padStart(2, '0')} /km</div>`;
+          } else if (c.speedUnit) {
+            const spd = round(dist / time); // m/min (swim)
+            speedLine = `<div class="if-meta">avg ${spd} ${c.speedUnit}</div>`;
+          }
         }
         return `
           <div class="card">
@@ -2395,9 +2451,9 @@
               <span class="view-link" onclick="openEntries('${c.key}','cardio')">edit${n ? ` (${n})` : ''}</span>
             </div>
             <div class="total-line">
-              <span class="total-value">${fmtMMSS(time)}</span><span class="total-unit">m:ss</span>
+              <span class="total-pair"><span class="total-value">${fmtMMSS(time)}</span><span class="total-unit">m:ss</span></span>
               <span class="total-sep">·</span>
-              <span class="total-value">${dist}</span><span class="total-unit">${c.distUnit}</span>
+              <span class="total-pair"><span class="total-value">${dist}</span><span class="total-unit">${c.distUnit}</span></span>
             </div>
             ${speedLine}
             <div class="add-row">
@@ -2606,7 +2662,7 @@
           <div class="if-status">
             <div class="if-elapsed" id="ifElapsed">--</div>
             <div class="if-meta" id="ifCountLabel">remaining until ${goalH}h goal</div>
-            <div class="if-bar"><div class="if-fill" id="ifFill" style="width:0%"></div></div>
+            <div class="if-bar"><div class="if-fill" id="ifFill" style="transform:scaleX(0)"></div></div>
             <div class="if-meta" id="ifRemaining"></div>
             <div class="if-meta">Started ${fmtClock(o.start)}
               <span class="view-link" style="margin-left:6px" onclick="toggleStartEdit()">edit</span>
@@ -2691,7 +2747,7 @@
         if (rem) rem.textContent = `${fmtDur(-remaining)} past goal`;
       }
       if (fill) {
-        fill.style.width = Math.min(100, elapsed / goalMs * 100) + '%';
+        fill.style.transform = 'scaleX(' + Math.min(1, elapsed / goalMs) + ')';
         fill.classList.toggle('done', elapsed >= goalMs);
       }
     }
@@ -3432,13 +3488,18 @@
     }
     function deleteVariation(i) {
       const list = getVariations(varManagerKey);
+      const name = list[i];
+      if (!confirm('Delete "' + (name || 'this variation') + '"? This can\'t be undone.')) return;
       list.splice(i, 1);
       saveVariations(varManagerKey, list); renderVarManager();
     }
 
     function deleteEntry(id) {
-      const arr = getEntries(modalKey).filter(x => String(x.id) !== String(id));
-      setEntries(modalKey, arr);
+      const all = getEntries(modalKey);
+      const e = all.find(x => String(x.id) === String(id));
+      const label = (e && e.value != null && e.value !== '') ? ' (' + e.value + ')' : '';
+      if (!confirm('Delete this entry' + label + '? This can\'t be undone.')) return;
+      setEntries(modalKey, all.filter(x => String(x.id) !== String(id)));
       render();
       renderModalBody();
     }
@@ -3716,7 +3777,7 @@
       }
       if (progressEl) {
         progressEl.className = 'progress-fill ' + cls;
-        progressEl.style.width = ((total - remaining) / total * 100) + '%';
+        progressEl.style.transform = 'scaleX(' + (total ? (total - remaining) / total : 0) + ')';
       }
       // "Started"/"Ended" stats — first Start and End-Day times for the real current day.
       // Stored on today's record so they never drift on pause/resume. Legacy fallbacks:
@@ -3838,6 +3899,7 @@
       if (p) { p.mins = Math.max(0, Math.round(parseFloat(val) || 0)); syncDerived(t); saveTimer(t); refreshTimerUI(t); }
     }
     function deletePeriod(id) {
+      if (!confirm('Delete this work period? This can\'t be undone.')) return;
       const t = ensurePeriodLog(getTimer());
       t.periodLog = (t.periodLog || []).filter(x => String(x.id) !== String(id));
       syncDerived(t); saveTimer(t); refreshTimerUI(t); renderPeriods();
@@ -4203,18 +4265,30 @@
       let s; try { s = JSON.parse(localStorage.getItem('ht_collapsed') || 'null'); } catch (e) {}
       return (s && typeof s === 'object') ? s : { ...COLLAPSE_DEFAULTS };
     }
+    function setSectionExpanded(sec, collapsed) {
+      if (!sec) return;
+      const head = sec.querySelector('.section-toggle');
+      if (head) head.setAttribute('aria-expanded', String(!collapsed));
+    }
     function toggleSection(id) {
       const s = getCollapseState();
       s[id] = !s[id];
       localStorage.setItem('ht_collapsed', JSON.stringify(s));
       const sec = document.getElementById('sec-' + id);
-      if (sec) sec.classList.toggle('collapsed', !!s[id]);
+      if (sec) { sec.classList.toggle('collapsed', !!s[id]); setSectionExpanded(sec, !!s[id]); }
+    }
+    // Enter/Space activate a section header, matching native button semantics.
+    function sectionKey(e, id) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        toggleSection(id);
+      }
     }
     function applyCollapsed() {
       const s = getCollapseState();
       SECTION_IDS.forEach(id => {
         const sec = document.getElementById('sec-' + id);
-        if (sec) sec.classList.toggle('collapsed', !!s[id]);
+        if (sec) { sec.classList.toggle('collapsed', !!s[id]); setSectionExpanded(sec, !!s[id]); }
       });
     }
     function updateSectionSummaries() {
